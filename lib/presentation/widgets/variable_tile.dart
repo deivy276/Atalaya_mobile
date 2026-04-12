@@ -4,6 +4,12 @@ import '../../core/theme/pro_palette.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/well_variable.dart';
 
+enum VariableHealth {
+  normal,
+  warning,
+  critical,
+}
+
 class VariableTile extends StatelessWidget {
   const VariableTile({
     super.key,
@@ -11,6 +17,7 @@ class VariableTile extends StatelessWidget {
     required this.well,
     required this.job,
     required this.unitPreferences,
+    required this.health,
     required this.onTap,
   });
 
@@ -18,6 +25,7 @@ class VariableTile extends StatelessWidget {
   final String well;
   final String job;
   final Map<String, String> unitPreferences;
+  final VariableHealth health;
   final VoidCallback onTap;
 
   @override
@@ -35,6 +43,7 @@ class VariableTile extends StatelessWidget {
 
     final labelText = variable.configured ? variable.label : 'VAR ${variable.slot}';
     final valueText = _buildValueText(displayUnit);
+    final visualColor = _statusColor;
 
     return Material(
       color: Colors.transparent,
@@ -45,23 +54,47 @@ class VariableTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: ProPalette.card,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: ProPalette.stroke),
+            border: Border.all(color: visualColor.withOpacity(0.9)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: visualColor.withOpacity(0.18),
+                blurRadius: 14,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Text(
-                  labelText,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: ProPalette.muted,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: visualColor,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        labelText,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: ProPalette.muted,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -80,6 +113,17 @@ class VariableTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color get _statusColor {
+    switch (health) {
+      case VariableHealth.normal:
+        return ProPalette.ok;
+      case VariableHealth.warning:
+        return ProPalette.warn;
+      case VariableHealth.critical:
+        return ProPalette.danger;
+    }
   }
 
   String _buildValueText(String displayUnit) {

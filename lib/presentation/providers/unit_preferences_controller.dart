@@ -29,6 +29,12 @@ class UnitPreferencesController extends Notifier<Map<String, String>> {
     await _save(next);
   }
 
+  Future<void> clearAll() async {
+    state = const <String, String>{};
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+  }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_storageKey);

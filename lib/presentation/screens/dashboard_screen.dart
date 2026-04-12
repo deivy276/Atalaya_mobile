@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:intl/intl.dart';
@@ -11,6 +12,7 @@ import '../../data/models/attachment.dart';
 import '../../data/models/dashboard_payload.dart';
 import '../../data/models/well_variable.dart';
 import '../providers/alert_attachments_provider.dart';
+import '../providers/alert_settings_controller.dart';
 import '../providers/dashboard_controller.dart';
 import '../providers/trend_controller.dart';
 import '../providers/unit_preferences_controller.dart';
@@ -37,6 +39,13 @@ class DashboardScreen extends ConsumerWidget {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: <Widget>[
+          Builder(
+            builder: (context) => IconButton(
+              tooltip: 'Helpers',
+              onPressed: () => Scaffold.of(context).openEndDrawer(),
+              icon: const Icon(Icons.tune_rounded),
+            ),
+          ),
           IconButton(
             tooltip: 'Refrescar',
             onPressed: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
@@ -51,6 +60,7 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(width: 8),
         ],
       ),
+      endDrawer: const _HelpersDrawer(),
       body: dashboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _DashboardErrorState(
@@ -99,6 +109,7 @@ class DashboardScreen extends ConsumerWidget {
                           well: payload.well,
                           job: payload.job,
                           unitPreferences: unitPrefs,
+                          health: _variableHealth(variable, payload),
                           onTap: () => _openTrendBottomSheet(
                             context: context,
                             ref: ref,
@@ -135,18 +146,19 @@ class DashboardScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
                   sliver: SliverToBoxAdapter(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: ProPalette.panel,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: ProPalette.stroke),
-                      ),
-                      child: payload.alerts.isEmpty
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 32),
-                              child: Center(
-                                child: Text(
+                    child: payload.alerts.isEmpty
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                            decoration: BoxDecoration(
+                              color: ProPalette.panel,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: ProPalette.stroke),
+                            ),
+                            child: const Row(
+                              children: <Widget>[
+                                Icon(Icons.check_circle_outline, color: ProPalette.ok, size: 16),
+                                SizedBox(width: 8),
+                                Text(
                                   'Sin alertas recientes.',
                                   style: TextStyle(
                                     color: ProPalette.muted,
@@ -154,9 +166,17 @@ class DashboardScreen extends ConsumerWidget {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                              ),
-                            )
-                          : Column(
+                              ],
+                            ),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: ProPalette.panel,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: ProPalette.stroke),
+                            ),
+                            child: Column(
                               children: payload.alerts
                                   .map(
                                     (alert) => Padding(
@@ -168,12 +188,18 @@ class DashboardScreen extends ConsumerWidget {
                                           context: context,
                                           alert: alert,
                                         ),
+                                        onAttachmentTap: alert.attachmentsCount > 0
+                                            ? () => _openAttachmentPreviewModal(
+                                                  context: context,
+                                                  alert: alert,
+                                                )
+                                            : null,
                                       ),
                                     ),
                                   )
                                   .toList(growable: false),
                             ),
-                    ),
+                          ),
                   ),
                 ),
               ],
@@ -182,6 +208,21 @@ class DashboardScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  VariableHealth _variableHealth(WellVariable variable, DashboardPayload payload) {
+    if (!variable.configured || variable.sampleAt == null) {
+      return VariableHealth.critical;
+    }
+
+    final age = DateTime.now().toUtc().difference(variable.sampleAt!.toUtc()).inSeconds;
+    if (age <= payload.staleThresholdSeconds) {
+      return VariableHealth.normal;
+    }
+    if (age <= payload.staleThresholdSeconds * 2) {
+      return VariableHealth.warning;
+    }
+    return VariableHealth.critical;
   }
 
   List<WellVariable> _normalizeTo12Slots(List<WellVariable> variables) {
@@ -228,6 +269,93 @@ class DashboardScreen extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AlertDetailBottomSheet(alert: alert),
+    );
+  }
+
+  Future<void> _openAttachmentPreviewModal({
+    required BuildContext context,
+    required AtalayaAlert alert,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: ProPalette.card,
+        insetPadding: const EdgeInsets.all(14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: SizedBox(
+          width: 520,
+          height: 620,
+          child: _AttachmentPreviewPanel(alert: alert),
+        ),
+      ),
+    );
+  }
+}
+
+class _HelpersDrawer extends ConsumerWidget {
+  const _HelpersDrawer();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final alertSettings = ref.watch(alertSettingsControllerProvider);
+
+    return Drawer(
+      backgroundColor: ProPalette.card,
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+          children: <Widget>[
+            const Text(
+              'Helpers & Settings',
+              style: TextStyle(
+                color: ProPalette.accent,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile.adaptive(
+              value: alertSettings.enabled,
+              onChanged: (value) => ref.read(alertSettingsControllerProvider.notifier).setEnabled(value),
+              title: const Text('Notificaciones activas'),
+              subtitle: const Text('Habilita monitoreo de KP en pantalla.'),
+            ),
+            SwitchListTile.adaptive(
+              value: alertSettings.visual,
+              onChanged: (value) => ref.read(alertSettingsControllerProvider.notifier).setVisual(value),
+              title: const Text('Indicadores visuales'),
+              subtitle: const Text('Muestra resaltado para alertas nuevas.'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Severidad mínima'),
+              subtitle: Text(alertSettings.minSeverity.compactLabel),
+              trailing: DropdownButton<AlertSeverity>(
+                value: alertSettings.minSeverity,
+                items: AlertSeverity.values
+                    .map(
+                      (value) => DropdownMenuItem<AlertSeverity>(
+                        value: value,
+                        child: Text(value.compactLabel),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (value) => ref.read(alertSettingsControllerProvider.notifier).setMinSeverity(value),
+              ),
+            ),
+            const Divider(color: ProPalette.stroke),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Restablecer unidades'),
+              subtitle: const Text('Elimina conversiones guardadas por variable.'),
+              trailing: IconButton(
+                onPressed: () => ref.read(unitPreferencesControllerProvider.notifier).clearAll(),
+                icon: const Icon(Icons.restart_alt_rounded),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -701,6 +829,151 @@ class _AlertDetailBottomSheet extends ConsumerWidget {
       case AlertSeverity.ok:
         return const _AlertVisual(ProPalette.ok, 'OK');
     }
+  }
+}
+
+class _AttachmentPreviewPanel extends ConsumerWidget {
+  const _AttachmentPreviewPanel({required this.alert});
+
+  final AtalayaAlert alert;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attachmentsAsync = ref.watch(alertAttachmentsProvider(alert.id));
+
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  'Adjuntos • KP ${alert.id}',
+                  style: const TextStyle(
+                    color: ProPalette.accent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: attachmentsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(
+                child: Text(
+                  'Error cargando adjuntos: $error',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: ProPalette.warn),
+                ),
+              ),
+              data: (attachments) {
+                if (attachments.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No hay adjuntos para previsualizar.',
+                      style: TextStyle(color: ProPalette.muted),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  itemCount: attachments.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final attachment = attachments[index];
+                    final isImage = attachment.mimeType.toLowerCase().contains('image') ||
+                        attachment.url.toLowerCase().contains('.png') ||
+                        attachment.url.toLowerCase().contains('.jpg') ||
+                        attachment.url.toLowerCase().contains('.jpeg');
+
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: ProPalette.panel,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: ProPalette.stroke),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            attachment.name,
+                            style: const TextStyle(
+                              color: ProPalette.text,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (isImage && attachment.url.isNotEmpty)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: InteractiveViewer(
+                                minScale: 0.8,
+                                maxScale: 3,
+                                child: Image.network(
+                                  attachment.url,
+                                  height: 170,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const SizedBox(
+                                    height: 120,
+                                    child: Center(child: Text('No fue posible renderizar imagen.')),
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            const Text(
+                              'Archivo no previsualizable. Usa Descargar URL.',
+                              style: TextStyle(color: ProPalette.muted, fontSize: 11),
+                            ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: Text(
+                                  attachment.mimeType,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: ProPalette.muted, fontSize: 11),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: attachment.url.isEmpty
+                                    ? null
+                                    : () async {
+                                        await Clipboard.setData(ClipboardData(text: attachment.url));
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('URL copiada al portapapeles.')),
+                                          );
+                                        }
+                                      },
+                                icon: const Icon(Icons.download_rounded, size: 16),
+                                label: const Text('Descargar URL'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
