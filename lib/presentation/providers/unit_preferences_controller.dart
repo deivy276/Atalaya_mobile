@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +27,12 @@ class UnitPreferencesController extends Notifier<Map<String, String>> {
     final next = Map<String, String>.from(state)..remove(key);
     state = next;
     await _save(next);
+  }
+
+  Future<void> clearAll() async {
+    state = const <String, String>{};
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
   }
 
   Future<void> _load() async {
