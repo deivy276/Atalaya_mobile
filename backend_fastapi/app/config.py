@@ -1,14 +1,20 @@
 ﻿from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    _backend_root = Path(__file__).resolve().parents[1]
+
     model_config = SettingsConfigDict(
-        env_file='backend_fastapi/.env',
+        env_file=(
+            str(_backend_root / '.env'),
+            '.env',
+        ),
         env_file_encoding='utf-8',
         extra='ignore',
     )
