@@ -1,0 +1,1 @@
+ C:\\Users\\DeivyRafaelPatinoUga\\anaconda3\\Atalaya\\Mobile\\.dart_tool\\flutter_build\\e7aaf799b03323bcb22232c30ed0819d\\dart_build_result.json: 

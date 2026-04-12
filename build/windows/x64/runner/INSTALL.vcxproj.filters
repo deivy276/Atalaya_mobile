@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\DeivyRafaelPatinoUga\anaconda3\Atalaya\Mobile\build\windows\x64\CMakeFiles\9c4a4e782623fc59397a5d27646f65cd\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{68945DCB-1018-3F03-BC76-E8989CBC0E74}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
