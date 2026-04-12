@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -92,38 +92,51 @@ final notifiableAlertProvider = Provider<AtalayaAlert?>((ref) {
 });
 
 class DashboardController extends AsyncNotifier<DashboardViewState> {
+  static const Duration _basePollInterval = Duration(seconds: 4);
+  static const Duration _maxPollInterval = Duration(seconds: 15);
+  static const int _staleGraceSeconds = 8;
+
   Timer? _pollTimer;
-  bool _pollingStarted = false;
   bool _refreshInFlight = false;
   int _retryCount = 0;
+  int _consecutiveFailures = 0;
   DateTime? _lastAlertSeenAt;
   String? _lastAlertSeenId;
 
   @override
   Future<DashboardViewState> build() async {
-    _ensurePolling();
-    return _fetch(initialLoad: true, silent: true);
+    final initial = await _fetch(initialLoad: true, silent: true);
+    _scheduleNextPoll();
+    ref.onDispose(() => _pollTimer?.cancel());
+    return initial;
   }
 
   Future<void> forceRefresh() async {
     await _fetch(initialLoad: false, silent: false);
+    _scheduleNextPoll(immediate: false);
   }
 
   Future<void> retryNow() async {
     await forceRefresh();
   }
 
-  void _ensurePolling() {
-    if (_pollingStarted) {
-      return;
-    }
-    _pollingStarted = true;
-    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      unawaited(_fetch(initialLoad: false, silent: true));
-    });
+  void _scheduleNextPoll({bool immediate = false}) {
+    _pollTimer?.cancel();
+    final delay = immediate
+        ? Duration.zero
+        : Duration(
+            seconds: (_basePollInterval.inSeconds + (_consecutiveFailures * 2)).clamp(
+              _basePollInterval.inSeconds,
+              _maxPollInterval.inSeconds,
+            ),
+          );
 
-    ref.onDispose(() {
-      _pollTimer?.cancel();
+    _pollTimer = Timer(delay, () async {
+      if (!ref.mounted) {
+        return;
+      }
+      await _fetch(initialLoad: false, silent: true);
+      _scheduleNextPoll();
     });
   }
 
@@ -132,10 +145,11 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     required bool silent,
   }) async {
     if (_refreshInFlight) {
-      return state.value ?? DashboardViewState.fromPayload(
-        DashboardPayload.empty(),
-        connectionStatus: ConnectionStatus.waiting,
-      );
+      return state.value ??
+          DashboardViewState.fromPayload(
+            DashboardPayload.empty(),
+            connectionStatus: ConnectionStatus.waiting,
+          );
     }
 
     _refreshInFlight = true;
@@ -149,20 +163,20 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
       final repository = ref.read(atalayaRepositoryProvider);
       final payload = await repository.getDashboard();
       _retryCount = 0;
+      _consecutiveFailures = 0;
       final next = DashboardViewState.fromPayload(
         payload,
-        connectionStatus: _deriveStatus(payload),
+        connectionStatus: _deriveStatus(payload, previous: previous),
         newAlertIds: _collectNewAlertIds(payload.alerts),
       );
       state = AsyncData(next);
       return next;
     } catch (error, stackTrace) {
       _retryCount += 1;
+      _consecutiveFailures += 1;
       if (previous != null) {
         final fallback = previous.copyWith(
-          connectionStatus: _retryCount >= 5
-              ? ConnectionStatus.offline
-              : ConnectionStatus.retrying,
+          connectionStatus: _retryCount >= 5 ? ConnectionStatus.offline : ConnectionStatus.retrying,
           isRefreshing: false,
           errorMessage: error.toString(),
         );
@@ -176,17 +190,26 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     }
   }
 
-  ConnectionStatus _deriveStatus(DashboardPayload payload) {
+  ConnectionStatus _deriveStatus(
+    DashboardPayload payload, {
+    DashboardViewState? previous,
+  }) {
     final latest = payload.latestSampleAt;
     if (latest == null) {
       return ConnectionStatus.stale;
     }
 
     final ageSeconds = DateTime.now().toUtc().difference(latest.toUtc()).inSeconds;
-    if (ageSeconds > payload.staleThresholdSeconds) {
-      return ConnectionStatus.stale;
+    if (ageSeconds <= payload.staleThresholdSeconds) {
+      return ConnectionStatus.connected;
     }
-    return ConnectionStatus.connected;
+
+    final withinGrace = ageSeconds <= (payload.staleThresholdSeconds + _staleGraceSeconds);
+    if (withinGrace && previous?.connectionStatus == ConnectionStatus.connected) {
+      return ConnectionStatus.connected;
+    }
+
+    return ConnectionStatus.stale;
   }
 
   Set<String> _collectNewAlertIds(List<AtalayaAlert> alerts) {

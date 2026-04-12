@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/pro_palette.dart';
@@ -10,11 +10,13 @@ class AlertCard extends StatelessWidget {
     required this.alert,
     required this.isNew,
     this.onTap,
+    this.onAttachmentTap,
   });
 
   final AtalayaAlert alert;
   final bool isNew;
   final VoidCallback? onTap;
+  final VoidCallback? onAttachmentTap;
 
   @override
   Widget build(BuildContext context) {
@@ -33,58 +35,76 @@ class AlertCard extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.all(10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Container(
-                  width: 6,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: visual.color,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 140,
-                  child: Text(
-                    DateFormat('yyyy-MM-dd HH:mm:ss').format(alert.createdAt.toLocal()),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: ProPalette.muted,
-                      fontSize: 10,
+                Row(
+                  children: <Widget>[
+                    Container(
+                      width: 6,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: visual.color,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    alert.description,
-                    style: const TextStyle(
-                      color: ProPalette.text,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'KP ${alert.id}',
+                        style: const TextStyle(
+                          color: ProPalette.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
+                    Text(
+                      DateFormat('yyyy-MM-dd HH:mm:ss').format(alert.createdAt.toLocal()),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: ProPalette.muted,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  alert.description,
+                  style: const TextStyle(
+                    color: ProPalette.text,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (isNew) ...<Widget>[
-                  _Chip(
-                    label: 'NEW',
-                    textColor: ProPalette.accent,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (alert.attachmentsCount > 0) ...<Widget>[
-                  _Chip(
-                    label: '📎 ${alert.attachmentsCount}',
-                    textColor: ProPalette.text,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                _Chip(
-                  label: visual.label,
-                  textColor: visual.color,
+                const SizedBox(height: 8),
+                Row(
+                  children: <Widget>[
+                    if (isNew) ...<Widget>[
+                      _Chip(
+                        label: 'NEW',
+                        textColor: ProPalette.accent,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (alert.attachmentsCount > 0) ...<Widget>[
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: onAttachmentTap,
+                        child: _Chip(
+                          label: '📎 ${alert.attachmentsCount}',
+                          textColor: ProPalette.text,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    _Chip(
+                      label: visual.label,
+                      textColor: visual.color,
+                    ),
+                  ],
                 ),
               ],
             ),
