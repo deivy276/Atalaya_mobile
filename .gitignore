@@ -25,7 +25,6 @@ venv/
 **/.env
 **/.env.*
 **/*.env
-**/.env.example
 
 # Python artifacts
 __pycache__/
@@ -39,3 +38,6 @@ venv/
 # Explicit sensitive file
 Token.txt
 **/Token.txt
+
+!**/.env.example
+!backend_fastapi/.env.example
