@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 Severity = Literal['OK', 'ATTENTION', 'CRITICAL']
 
@@ -25,7 +25,7 @@ class AlertOut(BaseModel):
     severity: Severity
     createdAt: datetime
     attachmentsCount: int = 0
-    attachments: list[AttachmentOut] = []
+    attachments: list[AttachmentOut] = Field(default_factory=list)
 
 
 class WellVariableOut(BaseModel):
@@ -38,6 +38,24 @@ class WellVariableOut(BaseModel):
     value: float | str | None = None
     sampleAt: datetime | None = None
     configured: bool = True
+
+
+class DashboardCoreOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    well: str
+    job: str
+    latestSampleAt: datetime | None = None
+    staleThresholdSeconds: int
+    variables: list[WellVariableOut] = Field(default_factory=list)
+
+
+class AlertsListOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    latestAlertAt: datetime | None = None
+    limit: int
+    alerts: list[AlertOut] = Field(default_factory=list)
 
 
 class DashboardOut(BaseModel):
@@ -59,11 +77,11 @@ class TrendPointOut(BaseModel):
 class TrendResponseOut(BaseModel):
     tag: str
     rawUnit: str = ''
-    points: list[TrendPointOut]
+    points: list[TrendPointOut] = Field(default_factory=list)
 
 
 class AttachmentsResponseOut(BaseModel):
-    attachments: list[AttachmentOut]
+    attachments: list[AttachmentOut] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):
