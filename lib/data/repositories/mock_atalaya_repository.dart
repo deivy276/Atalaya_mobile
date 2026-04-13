@@ -57,17 +57,15 @@ class MockAtalayaRepository implements AtalayaRepository {
   }) async {
     final now = DateTime.now().toUtc();
     final pointCount = switch (range) {
+      TrendRange.m30 => 18,
       TrendRange.h2 => 30,
       TrendRange.h6 => 45,
-      TrendRange.h12 => 60,
-      TrendRange.h24 => 80,
     };
 
     final stepMinutes = switch (range) {
+      TrendRange.m30 => 2,
       TrendRange.h2 => 4,
       TrendRange.h6 => 8,
-      TrendRange.h12 => 12,
-      TrendRange.h24 => 18,
     };
 
     final baseline = _baselineForTag(tag);
