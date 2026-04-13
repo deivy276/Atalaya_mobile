@@ -23,3 +23,23 @@ Para evitar fricción durante mejoras visuales, puedes correr la app en modo moc
 ```
 
 Este script ejecuta `flutter pub get` y levanta `flutter run -d chrome --dart-define=ATALAYA_USE_MOCK=true`.
+
+## Pruebas locales (estructura y smoke)
+
+Antes de ejecutar pruebas, actualiza/crea la estructura local de carpetas:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test\update_local_test_folders.ps1
+```
+
+```bash
+./scripts/test/update_local_test_folders.sh
+```
+
+Luego puedes correr:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_frontend.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_backend.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\test\run_stress_simulation.ps1
+```

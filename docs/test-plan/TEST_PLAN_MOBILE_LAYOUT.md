@@ -2,6 +2,25 @@
 
 Fecha: 2026-04-13
 
+## 0) Actualización local de carpetas (obligatorio antes de probar)
+Crear/confirmar estructura mínima:
+
+- `docs/test-plan/`
+- `checks/ui/`
+- `scripts/test/`
+- `test/widget/`
+- `test/integration/`
+
+### Opción PowerShell (Windows)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test\update_local_test_folders.ps1
+```
+
+### Opción bash (Linux/macOS/Git Bash)
+```bash
+./scripts/test/update_local_test_folders.sh
+```
+
 ## 1) Objetivo
 Validar de forma incremental la estabilidad funcional y visual de Atalaya Mobile sobre la arquitectura real del repositorio:
 - **Frontend:** Flutter (entrada principal en `DashboardScreen`).
