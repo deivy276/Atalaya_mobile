@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     alerts_cache_ttl_seconds: int = Field(default=2, alias='ALERTS_CACHE_TTL_SECONDS')
     kp_state_cache_ttl_seconds: int = Field(default=10, alias='KP_STATE_CACHE_TTL_SECONDS')
     sample_tag_existence_cache_ttl_seconds: int = Field(default=120, alias='SAMPLE_TAG_EXISTENCE_CACHE_TTL_SECONDS')
+
+
+    auth_enabled: bool = Field(default=False, alias='AUTH_ENABLED')
+    auth_secret_key: str = Field(default='change-me-local-dev', alias='AUTH_SECRET_KEY')
+    auth_cookie_name: str = Field(default='atalaya_session', alias='AUTH_COOKIE_NAME')
+    auth_cookie_secure: bool = Field(default=False, alias='AUTH_COOKIE_SECURE')
+    auth_session_timeout_hours: int = Field(default=12, alias='AUTH_SESSION_TIMEOUT_HOURS')
+    auth_sqlite_path: str = Field(default='backend_fastapi/data/auth.db', alias='AUTH_SQLITE_PATH')
+    bootstrap_admin_username: str = Field(default='admin', alias='BOOTSTRAP_ADMIN_USERNAME')
+    bootstrap_admin_password: str = Field(default='', alias='BOOTSTRAP_ADMIN_PASSWORD')
 
     latest_samples_summary_name: str = Field(
         default='public.atalaya_latest_samples_mv',
