@@ -35,18 +35,30 @@ Se agregó una capa de autenticación basada en cookie de sesión para proteger 
 - Login: `POST /auth/login` con `{"username":"...","password":"..."}`.
 - Logout: `POST /auth/logout`.
 - Perfil activo: `GET /auth/me`.
+- Gestión de usuarios (solo admin):
+  - `GET /auth/users`
+  - `POST /auth/users`
+  - `PATCH /auth/users/{username}/role`
+  - `PATCH /auth/users/{username}/activation`
 - Timeout de sesión: `AUTH_SESSION_TIMEOUT_HOURS` (recomendado 8-12 horas en operación).
 - Hash de contraseñas: se usa `werkzeug.security.generate_password_hash` y `check_password_hash` (nunca texto plano).
+- Política de contraseña mínima (configurable): longitud (`AUTH_PASSWORD_MIN_LENGTH`, default 12), complejidad (mayúscula/minúscula/número/símbolo) y lista prohibida (`AUTH_BANNED_PASSWORDS`).
+- Bloqueo temporal por intentos fallidos: configurable con `AUTH_LOGIN_MAX_ATTEMPTS` y `AUTH_LOGIN_LOCKOUT_MINUTES`.
 - RBAC:
   - `admin`: acceso total (incluye endpoints de debug).
   - `operator`: consumo de telemetría/KPs sin privilegios de administración.
+- Auditoría mínima en SQLite (`auth_audit_log`): login exitoso/fallido, logout, alta/baja de usuario y cambio de rol.
 
 Bootstrap local de usuario admin:
 
 1. En `.env`, define `BOOTSTRAP_ADMIN_USERNAME` y `BOOTSTRAP_ADMIN_PASSWORD`.
 2. Reinicia FastAPI; en startup se crea/actualiza el usuario admin en SQLite (`AUTH_SQLITE_PATH`).
 
-> Importante: en producción configura `AUTH_SECRET_KEY` robusta y `AUTH_COOKIE_SECURE=true`.
+> Importante (prod):
+> - Configura secreto por ambiente (`APP_ENV` + `AUTH_SECRET_KEY_DEV|STAGE|PROD`).
+> - Forzar cookie segura con `AUTH_COOKIE_SECURE=true`.
+> - Definir `AUTH_COOKIE_SAMESITE=lax` o `strict`.
+> - Nunca commitear `.env` real; usar gestor de secretos/vault.
 
 ## Base de datos esperada
 
