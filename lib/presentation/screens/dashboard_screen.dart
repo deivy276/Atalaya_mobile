@@ -405,7 +405,7 @@ class _PredictorAlertBarState extends State<_PredictorAlertBar> {
           decoration: BoxDecoration(
             color: ProPalette.panel,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor.withOpacity(0.85)),
+            border: Border.all(color: borderColor.withValues(alpha: 0.85)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -750,7 +750,7 @@ class _TrendBottomSheet extends ConsumerWidget {
                   SizedBox(
                     width: 180,
                     child: DropdownButtonFormField<String>(
-                      value: unitOptions.contains(selectedPreference)
+                      initialValue: unitOptions.contains(selectedPreference)
                           ? selectedPreference
                           : (unitOptions.isEmpty ? null : unitOptions.first),
                       items: unitOptions

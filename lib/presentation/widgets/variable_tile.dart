@@ -60,10 +60,10 @@ class VariableTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: ProPalette.card,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: visualColor.withOpacity(0.9)),
+            border: Border.all(color: visualColor.withValues(alpha: 0.9)),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: visualColor.withOpacity(0.18),
+                color: visualColor.withValues(alpha: 0.18),
                 blurRadius: 14,
                 spreadRadius: 0,
                 offset: const Offset(0, 2),
@@ -101,7 +101,7 @@ class VariableTile extends StatelessWidget {
                               ),
                               belowBarData: BarAreaData(
                                 show: true,
-                                color: visualColor.withOpacity(0.12),
+                                color: visualColor.withValues(alpha: 0.12),
                               ),
                             ),
                           ],
@@ -175,10 +175,10 @@ class VariableTile extends StatelessWidget {
 
   Color get _statusColor {
     if (kpSeverity == AlertSeverity.critical) {
-      return ProPalette.danger.withOpacity(0.95);
+      return ProPalette.danger.withValues(alpha: 0.95);
     }
     if (kpSeverity == AlertSeverity.attention) {
-      return ProPalette.warn.withOpacity(0.95);
+      return ProPalette.warn.withValues(alpha: 0.95);
     }
 
     switch (health) {
