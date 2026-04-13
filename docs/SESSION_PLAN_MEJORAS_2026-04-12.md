@@ -142,3 +142,24 @@ Con muestras antiguas (ej. >24h), el cálculo de estado marca `STALE` por diseñ
 2. Implementar Fase A.1 (`/health/details`) y Fase B.2 (`latest_sample_age_seconds`).
 3. Documentar setup en `docs/SETUP_WINDOWS_BACKEND.md`.
 
+# Atalaya Mobile — Bitácora de sesión y plan de mejoras
+
+Fecha: 2026-04-12
+
+## 1) Resumen de la sesión
+
+Durante esta sesión se atendieron tres frentes:
+
+1. **Error inicial 503 en dashboard (frontend web)**
+   - Se confirmó que la app cargaba, pero mostraba error por respuesta `503` del backend.
+   - Se ajustó el frontend para no caer en pantalla bloqueante y mostrar estado degradado con mensaje amigable.
+
+2. **Carga de variables de entorno en backend FastAPI**
+   - Se detectó fragilidad en la lectura de `.env` por ruta relativa.
+   - Se corrigió configuración para priorizar `backend_fastapi/.env`.
+   - Se agregó `backend_fastapi/.env.example` para guiar la configuración local.
+
+3. **Estado `STALE` persistente**
+   - Se validó que ya existe captura de datos del pozo.
+   - El estado `STALE` se debe a antigüedad real de muestra vs umbral de staleness.
+   - Se recomendó calibrar `STALE_THRESHOLD_SECONDS` según cadencia real de telemetría.
