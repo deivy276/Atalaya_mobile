@@ -14,7 +14,7 @@ function Invoke-Step {
 }
 
 Invoke-Step "[smoke-frontend] flutter pub get" "flutter pub get"
-Invoke-Step "[smoke-frontend] flutter analyze (lib + stable tests)" "flutter analyze lib test/unit_converter_test.dart test/widget_test.dart"
-Invoke-Step "[smoke-frontend] flutter test (stable tests)" "flutter test test/unit_converter_test.dart test/widget_test.dart"
+Invoke-Step "[smoke-frontend] flutter analyze (lib + stable tests)" "flutter analyze lib test/unit_converter_test.dart test/layout_order_controller_test.dart test/widget_test.dart"
+Invoke-Step "[smoke-frontend] flutter test (stable tests)" "flutter test test/unit_converter_test.dart test/layout_order_controller_test.dart test/widget_test.dart"
 
 Write-Host "[note] Para ejecutar el suite completo (incluye placeholders), usa: flutter analyze && flutter test"

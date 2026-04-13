@@ -8,12 +8,13 @@ Repositorio: `Atalaya_mobile`
 
 ```powershell
 git pull
+powershell -ExecutionPolicy Bypass -File .\scripts\test\update_local_test_folders.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_frontend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_backend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\test\run_stress_simulation.ps1
 ```
 
-## 2) Resultado ejecutivo
+## 2) Resultado ejecutivo (última corrida reportada)
 
 - ✅ **Smoke Frontend:** PASS
   - `flutter analyze (lib + stable tests)` sin issues.
@@ -21,28 +22,27 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test\run_stress_simulation.ps
 - ✅ **Smoke Backend:** PASS
   - checks `v3`, `v31`, `v32` ejecutados sin excepciones fatales.
 - ✅ **Stress/Benchmark:** PASS
-  - Dashboard: patrón esperado MISS/HIT y tiempos consistentes.
-  - Alerts: patrón esperado MISS/HIT y tiempos consistentes.
+  - Dashboard y Alerts con patrón esperado MISS/HIT y tiempos consistentes.
 
 ## 3) Métricas observadas (resumen)
 
 ### Dashboard benchmark
-- Cold dashboard: ~1469 ms (MISS)
-- Immediate dashboard: ~42 ms (HIT)
-- Fresh dashboard core: ~1612 ms (MISS)
-- Fresh alerts (separado): ~697 ms (MISS)
-- Legacy full dashboard: ~1113 ms (MISS)
+- Cold dashboard: ~1775 ms (MISS)
+- Immediate dashboard: ~30 ms (HIT)
+- Fresh dashboard core: ~896 ms (MISS)
+- Fresh alerts (separado): ~730 ms (MISS)
+- Legacy full dashboard: ~1193 ms (MISS)
 
 ### Alerts benchmark
-- Fresh alerts: ~802 ms (MISS)
-- Cached alerts: ~47 ms (HIT)
-- Immediate cached alerts: ~68 ms (HIT)
+- Fresh alerts: ~866 ms (MISS)
+- Cached alerts: ~49 ms (HIT)
+- Immediate cached alerts: ~72 ms (HIT)
 
 ## 4) Evidencia funcional
 
-- Frontend smoke ejecutado con el script estable de repo (`run_smoke_frontend.ps1`).
+- Frontend smoke ejecutado con script estable (`run_smoke_frontend.ps1`).
 - Backend smoke validando materialized views y endpoint de alertas case-insensitive (`run_smoke_backend.ps1`).
-- Stress ejecutado con benchmarks existentes (`run_stress_simulation.ps1`).
+- Stress ejecutado con benchmarks existentes (`run_stress_simulation.ps1`) tras validar backend HTTP activo.
 
 ## 5) Pendientes recomendados
 

@@ -44,7 +44,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_backend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\test\run_stress_simulation.ps1
 ```
 
-> `run_smoke_frontend.ps1` ejecuta un smoke estable (`lib` + `test/unit_converter_test.dart` + `test/widget_test.dart`).
+> `run_smoke_frontend.ps1` ejecuta un smoke estable (`lib` + `test/unit_converter_test.dart` + `test/layout_order_controller_test.dart` + `test/widget_test.dart`).
 > Para suite completa: `flutter analyze && flutter test`.
 
 Última acta de corrida local: `docs/test-plan/LAST_LOCAL_VALIDATION.md`.
