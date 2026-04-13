@@ -35,6 +35,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  final Set<String> _acknowledgedAlertIds = <String>{};
+
   @override
   Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(dashboardControllerProvider);
@@ -96,8 +98,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           return LayoutBuilder(
             builder: (context, constraints) {
               final isCompact = constraints.maxWidth < 700;
-              final crossAxisCount = constraints.maxWidth < 500 ? 1 : (constraints.maxWidth < 920 ? 2 : 3);
+              final crossAxisCount = editLayoutMode ? 1 : (constraints.maxWidth < 1280 ? 2 : 3);
               final canReorder = editLayoutMode && crossAxisCount == 1;
+              final visibleAlerts = payload.alerts
+                  .where((alert) => !_acknowledgedAlertIds.contains(alert.id))
+                  .toList(growable: false);
 
               return RefreshIndicator(
             color: ProPalette.accent,
@@ -255,22 +260,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     sliver: SliverToBoxAdapter(
-                      child: Column(
-                        children: <Widget>[
-                          if (activeDragVariable != null)
-                            _SpecialTrendCard(
-                              title: 'Active Drag',
-                              variable: activeDragVariable,
-                              points: viewState.variableHistoryByTag[activeDragVariable.tag] ?? const <double>[],
-                            ),
-                          if (activeDragVariable != null && tensionVariable != null) const SizedBox(height: 10),
-                          if (tensionVariable != null)
-                            _SpecialTrendCard(
-                              title: 'Tension',
-                              variable: tensionVariable,
-                              points: viewState.variableHistoryByTag[tensionVariable.tag] ?? const <double>[],
-                            ),
-                        ],
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: ProPalette.panel,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: ProPalette.stroke),
+                        ),
+                        child: ExpansionTile(
+                          title: const Text(
+                            'Mostrar gráficas especiales',
+                            style: TextStyle(color: ProPalette.text, fontWeight: FontWeight.w700, fontSize: 12),
+                          ),
+                          subtitle: const Text(
+                            'Active Drag / Tension',
+                            style: TextStyle(color: ProPalette.muted, fontSize: 11),
+                          ),
+                          collapsedIconColor: ProPalette.muted,
+                          iconColor: ProPalette.accent,
+                          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          children: <Widget>[
+                            if (activeDragVariable != null)
+                              _SpecialTrendCard(
+                                title: 'Active Drag',
+                                variable: activeDragVariable,
+                                points: viewState.variableHistoryByTag[activeDragVariable.tag] ?? const <double>[],
+                              ),
+                            if (activeDragVariable != null && tensionVariable != null) const SizedBox(height: 10),
+                            if (tensionVariable != null)
+                              _SpecialTrendCard(
+                                title: 'Tension',
+                                variable: tensionVariable,
+                                points: viewState.variableHistoryByTag[tensionVariable.tag] ?? const <double>[],
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -293,7 +316,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
                   sliver: SliverToBoxAdapter(
-                    child: payload.alerts.isEmpty
+                    child: visibleAlerts.isEmpty
                         ? Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
                             decoration: BoxDecoration(
@@ -324,23 +347,42 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               border: Border.all(color: ProPalette.stroke),
                             ),
                             child: Column(
-                              children: payload.alerts
+                              children: visibleAlerts
                                   .map(
                                     (alert) => Padding(
                                       padding: const EdgeInsets.only(bottom: 10),
-                                      child: AlertCard(
-                                        alert: alert,
-                                        isNew: viewState.newAlertIds.contains(alert.id),
-                                        onTap: () => _openAlertBottomSheet(
-                                          context: context,
-                                          alert: alert,
+                                      child: Dismissible(
+                                        key: ValueKey<String>('alert-${alert.id}'),
+                                        direction: DismissDirection.endToStart,
+                                        background: Container(
+                                          alignment: Alignment.centerRight,
+                                          decoration: BoxDecoration(
+                                            color: ProPalette.ok.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          child: const Icon(Icons.done_all_rounded, color: ProPalette.ok),
                                         ),
-                                        onAttachmentTap: alert.attachmentsCount > 0
-                                            ? () => _openAttachmentPreviewModal(
-                                                  context: context,
-                                                  alert: alert,
-                                                )
-                                            : null,
+                                        onDismissed: (_) => setState(() {
+                                          _acknowledgedAlertIds.add(alert.id);
+                                        }),
+                                        child: AlertCard(
+                                          alert: alert,
+                                          isNew: viewState.newAlertIds.contains(alert.id),
+                                          onTap: () => _openAlertBottomSheet(
+                                            context: context,
+                                            alert: alert,
+                                          ),
+                                          onAttachmentTap: alert.attachmentsCount > 0
+                                              ? () => _openAttachmentPreviewModal(
+                                                    context: context,
+                                                    alert: alert,
+                                                  )
+                                              : null,
+                                          onAcknowledgeTap: () => setState(() {
+                                            _acknowledgedAlertIds.add(alert.id);
+                                          }),
+                                        ),
                                       ),
                                     ),
                                   )

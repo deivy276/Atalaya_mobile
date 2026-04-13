@@ -11,12 +11,14 @@ class AlertCard extends StatelessWidget {
     required this.isNew,
     this.onTap,
     this.onAttachmentTap,
+    this.onAcknowledgeTap,
   });
 
   final AtalayaAlert alert;
   final bool isNew;
   final VoidCallback? onTap;
   final VoidCallback? onAttachmentTap;
+  final VoidCallback? onAcknowledgeTap;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +70,14 @@ class AlertCard extends StatelessWidget {
                         fontSize: 10,
                       ),
                     ),
+                    if (onAcknowledgeTap != null) ...<Widget>[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Acknowledge',
+                        onPressed: onAcknowledgeTap,
+                        icon: const Icon(Icons.done_all_rounded, color: ProPalette.accent, size: 18),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 8),
