@@ -28,7 +28,7 @@ Resultados esperados:
 
 Si `/health` responde pero `/health/db` falla, el problema ya no es FastAPI sino la conexión a PostgreSQL o la contraseña.
 
-## Seguridad (sesiones + roles)
+## Seguridad (sesiones + roles + RBAC)
 
 Se agregó una capa de autenticación basada en cookie de sesión para proteger endpoints cuando se activa `AUTH_ENABLED=true`.
 
@@ -40,6 +40,12 @@ Se agregó una capa de autenticación basada en cookie de sesión para proteger 
   - `POST /auth/users`
   - `PATCH /auth/users/{username}/role`
   - `PATCH /auth/users/{username}/activation`
+- Catálogo RBAC (solo admin):
+  - `GET /auth/roles`
+  - `GET /auth/permissions`
+- Scope por pozo:
+  - `GET /auth/users/{username}/well-access` (admin/specialist)
+  - `PUT /auth/users/{username}/well-access` (solo admin)
 - Timeout de sesión: `AUTH_SESSION_TIMEOUT_HOURS` (recomendado 8-12 horas en operación).
 - Hash de contraseñas: se usa `werkzeug.security.generate_password_hash` y `check_password_hash` (nunca texto plano).
 - Política de contraseña mínima (configurable): longitud (`AUTH_PASSWORD_MIN_LENGTH`, default 12), complejidad (mayúscula/minúscula/número/símbolo) y lista prohibida (`AUTH_BANNED_PASSWORDS`).
@@ -47,12 +53,13 @@ Se agregó una capa de autenticación basada en cookie de sesión para proteger 
 - RBAC:
   - `admin`: acceso total (incluye endpoints de debug).
   - `operator`: consumo de telemetría/KPs sin privilegios de administración.
-- Auditoría mínima en SQLite (`auth_audit_log`): login exitoso/fallido, logout, alta/baja de usuario y cambio de rol.
+- Auditoría mínima en PostgreSQL (`auth_audit_log`): login exitoso/fallido, logout, alta/baja de usuario y cambio de rol.
+- La autenticación ya no depende de SQLite local: usa tablas en PostgreSQL (`users`, `roles`, `permissions`, `role_permissions`, `user_well_access`).
 
 Bootstrap local de usuario admin:
 
 1. En `.env`, define `BOOTSTRAP_ADMIN_USERNAME` y `BOOTSTRAP_ADMIN_PASSWORD`.
-2. Reinicia FastAPI; en startup se crea/actualiza el usuario admin en SQLite (`AUTH_SQLITE_PATH`).
+2. Reinicia FastAPI; en startup se crea/actualiza el usuario admin en PostgreSQL (tabla `users`).
 
 > Importante (prod):
 > - Configura secreto por ambiente (`APP_ENV` + `AUTH_SECRET_KEY_DEV|STAGE|PROD`).

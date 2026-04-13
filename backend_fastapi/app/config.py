@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     auth_cookie_secure: bool = Field(default=False, alias='AUTH_COOKIE_SECURE')
     auth_cookie_samesite: str = Field(default='lax', alias='AUTH_COOKIE_SAMESITE')
     auth_session_timeout_hours: int = Field(default=12, alias='AUTH_SESSION_TIMEOUT_HOURS')
-    auth_sqlite_path: str = Field(default='backend_fastapi/data/auth.db', alias='AUTH_SQLITE_PATH')
     auth_password_min_length: int = Field(default=12, alias='AUTH_PASSWORD_MIN_LENGTH')
     auth_login_max_attempts: int = Field(default=5, alias='AUTH_LOGIN_MAX_ATTEMPTS')
     auth_login_lockout_minutes: int = Field(default=15, alias='AUTH_LOGIN_LOCKOUT_MINUTES')

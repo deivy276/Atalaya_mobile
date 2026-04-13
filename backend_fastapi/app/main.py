@@ -15,18 +15,25 @@ from .auth import (
     UserActivationRequest,
     UserAdminOut,
     UserCreateRequest,
+    PermissionOut,
+    RoleOut,
     UserRoleUpdateRequest,
+    UserWellAccessUpdateRequest,
     UserOut,
     authenticate_user,
     clear_session_cookie,
     create_user,
     create_session_cookie,
+    get_user_well_access,
     init_auth_db,
+    list_permissions,
+    list_roles,
     list_users,
     record_logout,
     require_authenticated_if_enabled,
     require_roles_if_enabled,
     set_user_activation,
+    set_user_well_access,
     set_user_role,
     validate_auth_runtime_security,
 )
@@ -58,7 +65,13 @@ app.add_middleware(
 @app.on_event('startup')
 def startup_init_auth() -> None:
     validate_auth_runtime_security()
-    init_auth_db()
+    from .database import _ensure_session_factory
+
+    session = _ensure_session_factory()()
+    try:
+        init_auth_db(session)
+    finally:
+        session.close()
 
 
 @app.middleware('http')
@@ -299,8 +312,8 @@ def get_debug_sample_tags(
 
 
 @app.post('/auth/login', response_model=UserOut)
-def login(payload: LoginRequest, response: Response) -> UserOut:
-    user = authenticate_user(payload.username, payload.password)
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> UserOut:
+    user = authenticate_user(db, payload.username, payload.password)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid credentials')
     create_session_cookie(response, user)
@@ -311,9 +324,10 @@ def login(payload: LoginRequest, response: Response) -> UserOut:
 def logout(
     response: Response,
     user: AuthUser | None = Depends(require_authenticated_if_enabled),
+    db: Session = Depends(get_db),
 ) -> dict[str, str]:
     clear_session_cookie(response)
-    record_logout(user)
+    record_logout(db, user)
     return {'status': 'ok'}
 
 
@@ -325,18 +339,22 @@ def me(user: AuthUser | None = Depends(require_authenticated_if_enabled)) -> Use
 
 
 @app.get('/auth/users', response_model=list[UserAdminOut])
-def auth_users(_: AuthUser | None = Depends(require_roles_if_enabled('admin'))) -> list[UserAdminOut]:
-    return list_users()
+def auth_users(
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[UserAdminOut]:
+    return list_users(db)
 
 
 @app.post('/auth/users', response_model=UserAdminOut, status_code=status.HTTP_201_CREATED)
 def auth_create_user(
     payload: UserCreateRequest,
     actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
 ) -> UserAdminOut:
     if actor is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
-    return create_user(actor, payload)
+    return create_user(db, actor, payload)
 
 
 @app.patch('/auth/users/{username}/role', response_model=UserAdminOut)
@@ -344,10 +362,11 @@ def auth_update_role(
     username: str,
     payload: UserRoleUpdateRequest,
     actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
 ) -> UserAdminOut:
     if actor is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
-    return set_user_role(actor, username, payload.role)
+    return set_user_role(db, actor, username, payload.role)
 
 
 @app.patch('/auth/users/{username}/activation', response_model=UserAdminOut)
@@ -355,7 +374,45 @@ def auth_update_activation(
     username: str,
     payload: UserActivationRequest,
     actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
 ) -> UserAdminOut:
     if actor is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
-    return set_user_activation(actor, username, payload.is_active)
+    return set_user_activation(db, actor, username, payload.is_active)
+
+
+@app.get('/auth/permissions', response_model=list[PermissionOut])
+def auth_permissions(
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[PermissionOut]:
+    return list_permissions(db)
+
+
+@app.get('/auth/roles', response_model=list[RoleOut])
+def auth_roles(
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[RoleOut]:
+    return list_roles(db)
+
+
+@app.get('/auth/users/{username}/well-access', response_model=list[str])
+def auth_get_user_well_access(
+    username: str,
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> list[str]:
+    return get_user_well_access(db, username)
+
+
+@app.put('/auth/users/{username}/well-access', response_model=list[str])
+def auth_set_user_well_access(
+    username: str,
+    payload: UserWellAccessUpdateRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[str]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return set_user_well_access(db, actor, username, payload.wells)
