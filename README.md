@@ -23,3 +23,83 @@ Para evitar fricción durante mejoras visuales, puedes correr la app en modo moc
 ```
 
 Este script ejecuta `flutter pub get` y levanta `flutter run -d chrome --dart-define=ATALAYA_USE_MOCK=true`.
+
+## Arranque rápido en emulador Android (Windows)
+
+Si quieres automatizar el flujo `emulator + adb + flutter run`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev_run_android_emulator.ps1
+```
+
+Opciones comunes:
+
+```powershell
+# AVD específico
+powershell -ExecutionPolicy Bypass -File .\scripts\dev_run_android_emulator.ps1 -AvdName "Medium_Phone_API_36.0"
+
+# UI mock (sin backend)
+powershell -ExecutionPolicy Bypass -File .\scripts\dev_run_android_emulator.ps1 -UseMock
+
+# Backend custom
+powershell -ExecutionPolicy Bypass -File .\scripts\dev_run_android_emulator.ps1 -ApiBaseUrl "http://10.0.2.2:8010"
+```
+
+## Pruebas locales (estructura y smoke)
+
+Antes de ejecutar pruebas, actualiza/crea la estructura local de carpetas:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test\update_local_test_folders.ps1
+```
+
+```bash
+./scripts/test/update_local_test_folders.sh
+```
+
+Luego puedes correr:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_frontend.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_backend.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\test\run_stress_simulation.ps1
+```
+
+> `run_smoke_frontend.ps1` ejecuta un smoke estable (`lib` + `test/unit_converter_test.dart` + `test/layout_order_controller_test.dart` + `test/widget_test.dart`).
+> Para suite completa: `flutter analyze && flutter test`.
+
+Última acta de corrida local: `docs/test-plan/LAST_LOCAL_VALIDATION.md`.
+> `run_smoke_backend.ps1` valida checks DB y, si HTTP backend está activo en `127.0.0.1:8010`, también ejecuta el check API v32.
+> `run_stress_simulation.ps1` requiere backend HTTP activo en `127.0.0.1:8010`.
+
+
+
+### Solución de problemas frecuentes (Windows)
+
+Si `git pull` falla con:
+
+`The following untracked working tree files would be overwritten by merge: test/widget_test.dart`
+
+ejecuta (sin depender de scripts nuevos):
+
+```powershell
+Remove-Item .\test\widget_test.dart -Force -ErrorAction SilentlyContinue
+git pull
+```
+
+Opcional (si ya existe en tu rama):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test\fix_git_pull_untracked.ps1
+git pull
+```
+
+Si quieres limpiar *todos* los no trackeados (con cuidado):
+
+```powershell
+git clean -fd
+```
+
+> ⚠️ `git clean -fd` borra archivos no versionados.
+
+Si `run_smoke_backend.ps1` reporta `ModuleNotFoundError: No module named 'app'`, actualiza a la versión más reciente del script con `git pull` y vuelve a ejecutar desde la **raíz del repo**.
