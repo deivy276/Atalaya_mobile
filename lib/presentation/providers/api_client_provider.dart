@@ -4,7 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/datasources/atalaya_api_client.dart';
 import '../../data/repositories/atalaya_repository_impl.dart';
+import '../../data/repositories/mock_atalaya_repository.dart';
 import '../../domain/repositories/atalaya_repository.dart';
+
+bool _mockModeEnabled() {
+  const raw = String.fromEnvironment('ATALAYA_USE_MOCK', defaultValue: 'false');
+  return raw.toLowerCase() == 'true' || raw == '1';
+}
 
 String _defaultApiBaseUrl() {
   const configured = String.fromEnvironment('ATALAYA_API_BASE_URL', defaultValue: '');
@@ -85,5 +91,10 @@ final atalayaApiClientProvider = Provider<AtalayaApiClient>(
 );
 
 final atalayaRepositoryProvider = Provider<AtalayaRepository>(
-  (ref) => AtalayaRepositoryImpl(ref.watch(atalayaApiClientProvider)),
+  (ref) {
+    if (_mockModeEnabled()) {
+      return const MockAtalayaRepository();
+    }
+    return AtalayaRepositoryImpl(ref.watch(atalayaApiClientProvider));
+  },
 );
