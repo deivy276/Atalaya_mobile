@@ -1,5 +1,6 @@
 from time import perf_counter
 import traceback
+import json
 
 from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,7 @@ from .schemas import (
     AttachmentsResponseOut,
     DashboardCoreOut,
     DashboardOut,
+    HealthDetailsResponse,
     HealthResponse,
     TrendResponseOut,
 )
@@ -116,13 +118,52 @@ def health_db(db: Session = Depends(get_db)) -> dict[str, str]:
     return {'status': 'ok'}
 
 
+@app.get('/health/details', response_model=HealthDetailsResponse)
+def health_details(repository: AtalayaDataRepository = Depends(get_repository)) -> HealthDetailsResponse:
+    db_status = 'ok'
+    latest_sample_at = None
+    latest_sample_age_seconds = None
+    latest_sample_source = 'UNKNOWN'
+    status = 'ok'
+    try:
+        repository.db.execute(text('SELECT 1'))
+        latest_sample_at, latest_sample_age_seconds, latest_sample_source = repository.fetch_latest_sample_info()
+    except SQLAlchemyError:
+        db_status = 'error'
+        status = 'degraded'
+    return HealthDetailsResponse(
+        status=status,
+        dbStatus=db_status,
+        staleThresholdSeconds=settings.stale_threshold_seconds,
+        latestSampleAt=latest_sample_at,
+        latestSampleAgeSeconds=latest_sample_age_seconds,
+        latestSampleSource=latest_sample_source,
+    )
+
+
 @app.get(f'{settings.api_prefix}/dashboard', response_model=DashboardCoreOut)
 def get_dashboard(
     response: Response,
     fresh: bool = Query(False, description='Bypass the in-memory dashboard cache for benchmarking.'),
     repository: AtalayaDataRepository = Depends(get_repository),
 ) -> DashboardCoreOut:
+    started_at = perf_counter()
     payload = repository.fetch_dashboard(fresh=fresh)
+    configured_variables = sum(1 for item in payload.variables if item.configured)
+    print(
+        '[dashboard] '
+        + json.dumps(
+            {
+                'path': '/api/v1/dashboard',
+                'elapsed_ms': round((perf_counter() - started_at) * 1000.0, 1),
+                'configured_variables': configured_variables,
+                'latest_sample_age_seconds': payload.latestSampleAgeSeconds,
+                'cache_status': repository.last_dashboard_cache_status,
+                'kp_cache_status': repository.last_kp_cache_status,
+                'samples_source': repository.last_samples_source,
+            }
+        )
+    )
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
     response.headers['X-Samples-Source'] = repository.last_samples_source
@@ -136,7 +177,24 @@ def get_dashboard_full(
     alerts_fresh: bool = Query(False, description='Bypass alerts cache too.'),
     repository: AtalayaDataRepository = Depends(get_repository),
 ) -> DashboardOut:
+    started_at = perf_counter()
     payload = repository.fetch_dashboard_full(fresh=fresh, alerts_fresh=alerts_fresh)
+    configured_variables = sum(1 for item in payload.variables if item.configured)
+    print(
+        '[dashboard] '
+        + json.dumps(
+            {
+                'path': '/api/v1/dashboard/full',
+                'elapsed_ms': round((perf_counter() - started_at) * 1000.0, 1),
+                'configured_variables': configured_variables,
+                'latest_sample_age_seconds': payload.latestSampleAgeSeconds,
+                'cache_status': repository.last_dashboard_cache_status,
+                'kp_cache_status': repository.last_kp_cache_status,
+                'samples_source': repository.last_samples_source,
+                'alerts_cache_status': repository.last_alerts_cache_status,
+            }
+        )
+    )
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
     response.headers['X-Samples-Source'] = repository.last_samples_source

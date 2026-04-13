@@ -46,6 +46,7 @@ class DashboardCoreOut(BaseModel):
     well: str
     job: str
     latestSampleAt: datetime | None = None
+    latestSampleAgeSeconds: int | None = None
     staleThresholdSeconds: int
     variables: list[WellVariableOut] = Field(default_factory=list)
 
@@ -64,6 +65,7 @@ class DashboardOut(BaseModel):
     well: str
     job: str
     latestSampleAt: datetime | None = None
+    latestSampleAgeSeconds: int | None = None
     staleThresholdSeconds: int
     variables: list[WellVariableOut]
     alerts: list[AlertOut]
@@ -86,3 +88,12 @@ class AttachmentsResponseOut(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+
+
+class HealthDetailsResponse(BaseModel):
+    status: str
+    dbStatus: str
+    staleThresholdSeconds: int
+    latestSampleAt: datetime | None = None
+    latestSampleAgeSeconds: int | None = None
+    latestSampleSource: str = 'UNKNOWN'

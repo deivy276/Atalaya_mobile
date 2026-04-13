@@ -9,6 +9,7 @@
   "well": "IXACHI-45",
   "job": "Drilling",
   "latestSampleAt": "2026-04-10T15:12:20Z",
+  "latestSampleAgeSeconds": 4,
   "staleThresholdSeconds": 10,
   "variables": [
     {
@@ -79,7 +80,26 @@ Rangos permitidos:
 }
 ```
 
-## 4) Reglas de contrato
+## 4) Health detallado
+
+`GET /health/details`
+
+```json
+{
+  "status": "ok",
+  "dbStatus": "ok",
+  "staleThresholdSeconds": 10,
+  "latestSampleAt": "2026-04-10T15:12:20Z",
+  "latestSampleAgeSeconds": 4,
+  "latestSampleSource": "MATVIEW"
+}
+```
+
+- `status`: `ok` o `degraded`.
+- `dbStatus`: estado de conectividad a base de datos.
+- `latestSampleSource`: `MATVIEW`, `BASE_TABLE`, `NONE` o `UNKNOWN`.
+
+## 5) Reglas de contrato
 
 - Todas las fechas en UTC ISO-8601.
 - `severity` sólo puede ser `OK`, `ATTENTION` o `CRITICAL`.
