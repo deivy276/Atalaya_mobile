@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:intl/intl.dart';
@@ -84,6 +85,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           final baseVariables = _normalizeTo12Slots(payload.variables);
           final layoutOrder = _resolveLayoutOrder(layoutOrders, payload.well, payload.job);
           final variables = _applyLayoutOrder(baseVariables, layoutOrder);
+          final activeDragVariable = _findSpecialVariable(
+            variables: variables,
+            includesAny: const <String>['active drag', 'activedrag', 'drag'],
+          );
+          final tensionVariable = _findSpecialVariable(
+            variables: variables,
+            includesAny: const <String>['tension', 'hook load', 'hookload'],
+          );
           return LayoutBuilder(
             builder: (context, constraints) {
               final isCompact = constraints.maxWidth < 700;
@@ -227,6 +236,45 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                     ),
                   ),
+                if (activeDragVariable != null || tensionVariable != null) ...<Widget>[
+                  const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                  const SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: 14),
+                    sliver: SliverToBoxAdapter(
+                      child: Text(
+                        'ACTIVE DRAG & TENSION',
+                        style: TextStyle(
+                          color: ProPalette.accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        children: <Widget>[
+                          if (activeDragVariable != null)
+                            _SpecialTrendCard(
+                              title: 'Active Drag',
+                              variable: activeDragVariable,
+                              points: viewState.variableHistoryByTag[activeDragVariable.tag] ?? const <double>[],
+                            ),
+                          if (activeDragVariable != null && tensionVariable != null) const SizedBox(height: 10),
+                          if (tensionVariable != null)
+                            _SpecialTrendCard(
+                              title: 'Tension',
+                              variable: tensionVariable,
+                              points: viewState.variableHistoryByTag[tensionVariable.tag] ?? const <double>[],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
                 const SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: 14),
@@ -376,6 +424,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return slotOrder.map((slot) => bySlot[slot] ?? WellVariable.empty(slot)).toList(growable: false);
   }
 
+  WellVariable? _findSpecialVariable({
+    required List<WellVariable> variables,
+    required List<String> includesAny,
+  }) {
+    for (final variable in variables) {
+      final text = '${variable.label} ${variable.tag}'.toLowerCase();
+      final match = includesAny.any((needle) => text.contains(needle));
+      if (match && variable.configured) {
+        return variable;
+      }
+    }
+    return null;
+  }
+
   Future<void> _openTrendBottomSheet({
     required BuildContext context,
     required WidgetRef ref,
@@ -427,6 +489,117 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           height: 620,
           child: _AttachmentPreviewPanel(alert: alert),
         ),
+      ),
+    );
+  }
+}
+
+class _SpecialTrendCard extends StatelessWidget {
+  const _SpecialTrendCard({
+    required this.title,
+    required this.variable,
+    required this.points,
+  });
+
+  final String title;
+  final WellVariable variable;
+  final List<double> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasData = points.length >= 3;
+    final lastValue = points.isNotEmpty ? points.last : variable.value;
+    final unitText = variable.rawUnit.isEmpty ? '' : variable.rawUnit;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ProPalette.panel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ProPalette.stroke),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '$title • ${variable.label}',
+            style: const TextStyle(
+              color: ProPalette.text,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${UnitConverter.formatNumber(lastValue)} $unitText',
+            style: const TextStyle(
+              color: ProPalette.accent,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 78,
+            child: hasData
+                ? _SparklineMini(points: points)
+                : const Center(
+                    child: Text(
+                      'Sin historial suficiente',
+                      style: TextStyle(color: ProPalette.muted, fontSize: 11),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SparklineMini extends StatelessWidget {
+  const _SparklineMini({required this.points});
+
+  final List<double> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final min = points.reduce((a, b) => a < b ? a : b);
+    final max = points.reduce((a, b) => a > b ? a : b);
+    final span = (max - min).abs() < 0.0001 ? 1.0 : (max - min);
+    final spots = <FlSpot>[
+      for (var i = 0; i < points.length; i++) FlSpot(i.toDouble(), (points[i] - min) / span),
+    ];
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: points.length > 1 ? (points.length - 1).toDouble() : 1,
+        minY: 0,
+        maxY: 1,
+        borderData: FlBorderData(show: false),
+        gridData: const FlGridData(show: false),
+        titlesData: const FlTitlesData(
+          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        lineTouchData: const LineTouchData(enabled: false),
+        lineBarsData: <LineChartBarData>[
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: ProPalette.accent,
+            barWidth: 2.2,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: ProPalette.accent.withValues(alpha: 0.12),
+            ),
+          ),
+        ],
       ),
     );
   }
