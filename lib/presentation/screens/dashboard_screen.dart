@@ -14,6 +14,7 @@ import '../../data/models/well_variable.dart';
 import '../providers/alert_attachments_provider.dart';
 import '../providers/alert_settings_controller.dart';
 import '../providers/dashboard_controller.dart';
+import '../providers/layout_order_controller.dart';
 import '../providers/trend_controller.dart';
 import '../providers/unit_preferences_controller.dart';
 import '../widgets/alert_card.dart';
@@ -23,14 +24,23 @@ import '../widgets/variable_tile.dart';
 
 final selectedTrendRangeProvider =
     StateProvider.autoDispose.family<TrendRange, String>((ref, tag) => TrendRange.h2);
+final editLayoutModeProvider = StateProvider<bool>((ref) => false);
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  @override
+  Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(dashboardControllerProvider);
     final unitPrefs = ref.watch(unitPreferencesControllerProvider);
+    final editLayoutMode = ref.watch(editLayoutModeProvider);
+    final layoutOrders = ref.watch(layoutOrderControllerProvider);
+    final currentPayload = dashboardAsync.asData?.value.payload;
 
     return Scaffold(
       appBar: AppBar(
@@ -58,7 +68,10 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(width: 8),
         ],
       ),
-      endDrawer: const _HelpersDrawer(),
+      endDrawer: _HelpersDrawer(
+        well: currentPayload?.well,
+        job: currentPayload?.job,
+      ),
       bottomNavigationBar: _PredictorAlertBar(dashboardAsync: dashboardAsync),
       body: dashboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -68,11 +81,14 @@ class DashboardScreen extends ConsumerWidget {
         ),
         data: (viewState) {
           final payload = viewState.payload;
-          final variables = _normalizeTo12Slots(payload.variables);
+          final baseVariables = _normalizeTo12Slots(payload.variables);
+          final layoutOrder = _resolveLayoutOrder(layoutOrders, payload.well, payload.job);
+          final variables = _applyLayoutOrder(baseVariables, layoutOrder);
           return LayoutBuilder(
             builder: (context, constraints) {
               final isCompact = constraints.maxWidth < 700;
               final crossAxisCount = constraints.maxWidth < 500 ? 1 : (constraints.maxWidth < 920 ? 2 : 3);
+              final canReorder = editLayoutMode && crossAxisCount == 1;
 
               return RefreshIndicator(
             color: ProPalette.accent,
@@ -87,52 +103,130 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
-                const SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: 14),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   sliver: SliverToBoxAdapter(
-                    child: Text(
-                      'LIVE VARIABLES (tap for trend)',
-                      style: TextStyle(
-                        color: ProPalette.accent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    child: Row(
+                      children: <Widget>[
+                        const Expanded(
+                          child: Text(
+                            'LIVE VARIABLES (tap for trend)',
+                            style: TextStyle(
+                              color: ProPalette.accent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (editLayoutMode)
+                          Text(
+                            canReorder ? 'Modo editar (drag activo)' : 'Modo editar (usa ancho móvil)',
+                            style: const TextStyle(
+                              color: ProPalette.warn,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 6)),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  sliver: SliverGrid(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final variable = variables[index];
-                        return VariableTile(
-                          variable: variable,
-                          well: payload.well,
-                          job: payload.job,
-                          unitPreferences: unitPrefs,
-                          health: _variableHealth(variable, payload),
-                          sparklinePoints: viewState.variableHistoryByTag[variable.tag] ?? const <double>[],
-                          kpSeverity: _kpSeverityForVariable(variable, payload.alerts),
-                          onTap: () => _openTrendBottomSheet(
-                            context: context,
-                            ref: ref,
-                            payload: payload,
-                            variable: variable,
-                          ),
-                        );
-                      },
-                      childCount: variables.length,
+                if (canReorder)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    sliver: SliverToBoxAdapter(
+                      child: ReorderableListView.builder(
+                        shrinkWrap: true,
+                        buildDefaultDragHandles: false,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: variables.length,
+                        onReorder: (oldIndex, newIndex) async {
+                          final mutable = List<WellVariable>.from(variables);
+                          if (newIndex > oldIndex) {
+                            newIndex -= 1;
+                          }
+                          final item = mutable.removeAt(oldIndex);
+                          mutable.insert(newIndex, item);
+                          final slotOrder = mutable.map((it) => it.slot).toList(growable: false);
+                          await ref.read(layoutOrderControllerProvider.notifier).setOrder(
+                                well: payload.well,
+                                job: payload.job,
+                                slotOrder: slotOrder,
+                              );
+                        },
+                        itemBuilder: (context, index) {
+                          final variable = variables[index];
+                          return Padding(
+                            key: ValueKey<int>(variable.slot),
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Stack(
+                              children: <Widget>[
+                                VariableTile(
+                                  variable: variable,
+                                  well: payload.well,
+                                  job: payload.job,
+                                  unitPreferences: unitPrefs,
+                                  health: _variableHealth(variable, payload),
+                                  sparklinePoints: viewState.variableHistoryByTag[variable.tag] ?? const <double>[],
+                                  kpSeverity: _kpSeverityForVariable(variable, payload.alerts),
+                                  onTap: () {},
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: ReorderableDragStartListener(
+                                    index: index,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: ProPalette.bg.withValues(alpha: 0.8),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      padding: const EdgeInsets.all(6),
+                                      child: const Icon(Icons.drag_indicator_rounded, size: 16, color: ProPalette.muted),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: isCompact ? 2.2 : 1.15,
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    sliver: SliverGrid(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final variable = variables[index];
+                          return VariableTile(
+                            variable: variable,
+                            well: payload.well,
+                            job: payload.job,
+                            unitPreferences: unitPrefs,
+                            health: _variableHealth(variable, payload),
+                            sparklinePoints: viewState.variableHistoryByTag[variable.tag] ?? const <double>[],
+                            kpSeverity: _kpSeverityForVariable(variable, payload.alerts),
+                            onTap: () => _openTrendBottomSheet(
+                              context: context,
+                              ref: ref,
+                              payload: payload,
+                              variable: variable,
+                            ),
+                          );
+                        },
+                        childCount: variables.length,
+                      ),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: isCompact ? 2.2 : 1.15,
+                      ),
                     ),
                   ),
-                ),
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
                 const SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: 14),
@@ -261,6 +355,25 @@ class DashboardScreen extends ConsumerWidget {
       (index) => bySlot[index + 1] ?? WellVariable.empty(index + 1),
       growable: false,
     );
+  }
+
+  List<int> _resolveLayoutOrder(Map<String, List<int>> store, String well, String job) {
+    final key = 'layout_order::${well.trim().toUpperCase()}::${job.trim().toUpperCase()}';
+    final raw = store[key];
+    if (raw == null || raw.isEmpty) {
+      return List<int>.generate(12, (index) => index + 1, growable: false);
+    }
+    final orderedUnique = raw.toSet().where((slot) => slot >= 1 && slot <= 12).toList(growable: false);
+    final missing = <int>[
+      for (var i = 1; i <= 12; i++)
+        if (!orderedUnique.contains(i)) i,
+    ];
+    return <int>[...orderedUnique, ...missing];
+  }
+
+  List<WellVariable> _applyLayoutOrder(List<WellVariable> variables, List<int> slotOrder) {
+    final bySlot = <int, WellVariable>{for (final variable in variables) variable.slot: variable};
+    return slotOrder.map((slot) => bySlot[slot] ?? WellVariable.empty(slot)).toList(growable: false);
   }
 
   Future<void> _openTrendBottomSheet({
@@ -449,11 +562,15 @@ class _PredictorAlertBarState extends State<_PredictorAlertBar> {
 }
 
 class _HelpersDrawer extends ConsumerWidget {
-  const _HelpersDrawer();
+  const _HelpersDrawer({this.well, this.job});
+
+  final String? well;
+  final String? job;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final alertSettings = ref.watch(alertSettingsControllerProvider);
+    final editMode = ref.watch(editLayoutModeProvider);
 
     return Drawer(
       backgroundColor: ProPalette.card,
@@ -507,6 +624,38 @@ class _HelpersDrawer extends ConsumerWidget {
               trailing: IconButton(
                 onPressed: () => ref.read(unitPreferencesControllerProvider.notifier).clearAll(),
                 icon: const Icon(Icons.restart_alt_rounded),
+              ),
+            ),
+            const Divider(color: ProPalette.stroke),
+            SwitchListTile.adaptive(
+              value: editMode,
+              onChanged: (value) => ref.read(editLayoutModeProvider.notifier).state = value,
+              title: const Text('Modo editar layout'),
+              subtitle: const Text('Permite arrastrar tarjetas en vista móvil (1 columna).'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Restablecer layout'),
+              subtitle: Text(
+                (well == null || job == null)
+                    ? 'Disponible cuando haya contexto de pozo/job.'
+                    : 'Vuelve al orden por defecto para $well / $job.',
+              ),
+              trailing: IconButton(
+                onPressed: (well == null || job == null)
+                    ? null
+                    : () async {
+                        await ref.read(layoutOrderControllerProvider.notifier).resetOrder(
+                              well: well!,
+                              job: job!,
+                            );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Layout restablecido.')),
+                          );
+                        }
+                      },
+                icon: const Icon(Icons.view_stream_rounded),
               ),
             ),
           ],
