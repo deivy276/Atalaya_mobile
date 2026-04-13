@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, HTTPException, Request, Response, status
@@ -100,7 +100,7 @@ def init_auth_db() -> None:
             )
             '''
         )
-        now = datetime.now(tz=UTC).isoformat()
+        now = datetime.now(tz=timezone.utc).isoformat()
         if settings.bootstrap_admin_password:
             validate_password_policy(settings.bootstrap_admin_password)
             password_hash = generate_password_hash(settings.bootstrap_admin_password)
@@ -164,7 +164,7 @@ def _audit_log(
     target_username: str | None = None,
     metadata_json: str | None = None,
 ) -> None:
-    now = datetime.now(tz=UTC).isoformat()
+    now = datetime.now(tz=timezone.utc).isoformat()
     with _connect() as conn:
         conn.execute(
             '''
@@ -181,14 +181,14 @@ def _is_locked_out(row: sqlite3.Row | None) -> tuple[bool, datetime | None]:
         return False, None
     locked_until = datetime.fromisoformat(str(row['locked_until']))
     if locked_until.tzinfo is None:
-        locked_until = locked_until.replace(tzinfo=UTC)
-    now = datetime.now(tz=UTC)
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    now = datetime.now(tz=timezone.utc)
     return locked_until > now, locked_until
 
 
 def _record_failed_login(username: str) -> tuple[int, datetime | None]:
     settings = get_settings()
-    now = datetime.now(tz=UTC)
+    now = datetime.now(tz=timezone.utc)
     with _connect() as conn:
         row = conn.execute(
             'SELECT username, attempts, locked_until FROM auth_login_attempts WHERE username = ?',
@@ -344,7 +344,7 @@ def list_users() -> list[UserAdminOut]:
 
 def create_user(actor: AuthUser, payload: UserCreateRequest) -> UserAdminOut:
     validate_password_policy(payload.password)
-    now = datetime.now(tz=UTC).isoformat()
+    now = datetime.now(tz=timezone.utc).isoformat()
     normalized = payload.username.strip().lower()
     password_hash = generate_password_hash(payload.password)
     with _connect() as conn:
@@ -369,7 +369,7 @@ def set_user_role(actor: AuthUser, username: str, role: str) -> UserAdminOut:
             SET role = ?, updated_at = ?
             WHERE lower(username) = ?
             ''',
-            (role.lower(), datetime.now(tz=UTC).isoformat(), normalized),
+            (role.lower(), datetime.now(tz=timezone.utc).isoformat(), normalized),
         )
         row = conn.execute(
             'SELECT username, role, is_active FROM users WHERE lower(username) = ?',
@@ -391,7 +391,7 @@ def set_user_activation(actor: AuthUser, username: str, is_active: bool) -> User
             SET is_active = ?, updated_at = ?
             WHERE lower(username) = ?
             ''',
-            (1 if is_active else 0, datetime.now(tz=UTC).isoformat(), normalized),
+            (1 if is_active else 0, datetime.now(tz=timezone.utc).isoformat(), normalized),
         )
         row = conn.execute(
             'SELECT username, role, is_active FROM users WHERE lower(username) = ?',
