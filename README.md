@@ -43,3 +43,27 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_frontend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\test\run_smoke_backend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\test\run_stress_simulation.ps1
 ```
+
+
+### Solución de problemas frecuentes (Windows)
+
+Si `git pull` falla con:
+
+`The following untracked working tree files would be overwritten by merge: test/widget_test.dart`
+
+ejecuta:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test\fix_git_pull_untracked.ps1
+git pull
+```
+
+Si quieres limpiar *todos* los no trackeados (con cuidado):
+
+```powershell
+git clean -fd
+```
+
+> ⚠️ `git clean -fd` borra archivos no versionados.
+
+Si `run_smoke_backend.ps1` reporta `ModuleNotFoundError: No module named 'app'`, actualiza a la versión más reciente del script con `git pull` y vuelve a ejecutar desde la **raíz del repo**.
