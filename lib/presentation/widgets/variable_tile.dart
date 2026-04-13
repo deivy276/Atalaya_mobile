@@ -1,7 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/theme/pro_palette.dart';
 import '../../core/utils/unit_converter.dart';
+import '../../data/models/alert.dart';
 import '../../data/models/well_variable.dart';
 
 enum VariableHealth {
@@ -19,6 +21,8 @@ class VariableTile extends StatelessWidget {
     required this.unitPreferences,
     required this.health,
     required this.onTap,
+    this.sparklinePoints = const <double>[],
+    this.kpSeverity,
   });
 
   final WellVariable variable;
@@ -27,6 +31,8 @@ class VariableTile extends StatelessWidget {
   final Map<String, String> unitPreferences;
   final VariableHealth health;
   final VoidCallback onTap;
+  final List<double> sparklinePoints;
+  final AlertSeverity? kpSeverity;
 
   @override
   Widget build(BuildContext context) {
@@ -54,68 +60,127 @@ class VariableTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: ProPalette.card,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: visualColor.withOpacity(0.9)),
+            border: Border.all(color: visualColor.withValues(alpha: 0.9)),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: visualColor.withOpacity(0.18),
+                color: visualColor.withValues(alpha: 0.18),
                 blurRadius: 14,
                 spreadRadius: 0,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: visualColor,
-                        borderRadius: BorderRadius.circular(999),
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              if (sparklinePoints.length >= 2)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: 0.35,
+                      child: LineChart(
+                        LineChartData(
+                          minY: _minY,
+                          maxY: _maxY,
+                          gridData: const FlGridData(show: false),
+                          titlesData: const FlTitlesData(show: false),
+                          borderData: FlBorderData(show: false),
+                          lineTouchData: const LineTouchData(enabled: false),
+                          clipData: const FlClipData.all(),
+                          lineBarsData: <LineChartBarData>[
+                            LineChartBarData(
+                              isCurved: true,
+                              dotData: const FlDotData(show: false),
+                              barWidth: 1.6,
+                              color: visualColor,
+                              spots: List<FlSpot>.generate(
+                                sparklinePoints.length,
+                                (index) => FlSpot(index.toDouble(), sparklinePoints[index]),
+                                growable: false,
+                              ),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: visualColor.withValues(alpha: 0.12),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        labelText,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: ProPalette.muted,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: visualColor,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                         ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            labelText,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: ProPalette.muted,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      valueText,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  valueText,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    height: 1.15,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
+  double get _minY {
+    final min = sparklinePoints.reduce((a, b) => a < b ? a : b);
+    return min - (min.abs() * 0.03 + 0.001);
+  }
+
+  double get _maxY {
+    final max = sparklinePoints.reduce((a, b) => a > b ? a : b);
+    return max + (max.abs() * 0.03 + 0.001);
+  }
+
   Color get _statusColor {
+    if (kpSeverity == AlertSeverity.critical) {
+      return ProPalette.danger.withValues(alpha: 0.95);
+    }
+    if (kpSeverity == AlertSeverity.attention) {
+      return ProPalette.warn.withValues(alpha: 0.95);
+    }
+
     switch (health) {
       case VariableHealth.normal:
         return ProPalette.ok;

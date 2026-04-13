@@ -22,6 +22,8 @@ class DashboardViewState {
     required this.isRefreshing,
     required this.newAlertIds,
     required this.errorMessage,
+    required this.variableHistoryByTag,
+    required this.latestIncomingAlert,
   });
 
   final DashboardPayload payload;
@@ -29,6 +31,8 @@ class DashboardViewState {
   final bool isRefreshing;
   final Set<String> newAlertIds;
   final String? errorMessage;
+  final Map<String, List<double>> variableHistoryByTag;
+  final AtalayaAlert? latestIncomingAlert;
 
   DashboardViewState copyWith({
     DashboardPayload? payload,
@@ -37,6 +41,9 @@ class DashboardViewState {
     Set<String>? newAlertIds,
     String? errorMessage,
     bool clearErrorMessage = false,
+    Map<String, List<double>>? variableHistoryByTag,
+    AtalayaAlert? latestIncomingAlert,
+    bool clearLatestIncomingAlert = false,
   }) {
     return DashboardViewState(
       payload: payload ?? this.payload,
@@ -44,6 +51,8 @@ class DashboardViewState {
       isRefreshing: isRefreshing ?? this.isRefreshing,
       newAlertIds: newAlertIds ?? this.newAlertIds,
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      variableHistoryByTag: variableHistoryByTag ?? this.variableHistoryByTag,
+      latestIncomingAlert: clearLatestIncomingAlert ? null : (latestIncomingAlert ?? this.latestIncomingAlert),
     );
   }
 
@@ -52,6 +61,8 @@ class DashboardViewState {
     required ConnectionStatus connectionStatus,
     Set<String> newAlertIds = const <String>{},
     String? errorMessage,
+    Map<String, List<double>> variableHistoryByTag = const <String, List<double>>{},
+    AtalayaAlert? latestIncomingAlert,
   }) {
     return DashboardViewState(
       payload: payload,
@@ -59,6 +70,8 @@ class DashboardViewState {
       isRefreshing: false,
       newAlertIds: newAlertIds,
       errorMessage: errorMessage,
+      variableHistoryByTag: variableHistoryByTag,
+      latestIncomingAlert: latestIncomingAlert,
     );
   }
 }
@@ -95,6 +108,7 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
   static const Duration _basePollInterval = Duration(seconds: 4);
   static const Duration _maxPollInterval = Duration(seconds: 15);
   static const int _staleGraceSeconds = 8;
+  static const int _maxHistoryPointsPerVariable = 24;
 
   Timer? _pollTimer;
   bool _refreshInFlight = false;
@@ -164,10 +178,13 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
       final payload = await repository.getDashboard();
       _retryCount = 0;
       _consecutiveFailures = 0;
+      final newAlertIds = _collectNewAlertIds(payload.alerts);
       final next = DashboardViewState.fromPayload(
         payload,
         connectionStatus: _deriveStatus(payload, previous: previous),
-        newAlertIds: _collectNewAlertIds(payload.alerts),
+        newAlertIds: newAlertIds,
+        variableHistoryByTag: _mergeVariableHistory(previous?.variableHistoryByTag, payload),
+        latestIncomingAlert: _resolveLatestIncomingAlert(payload.alerts, newAlertIds),
       );
       state = AsyncData(next);
       return next;
@@ -227,6 +244,44 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     }
 
     return ConnectionStatus.stale;
+  }
+
+
+  Map<String, List<double>> _mergeVariableHistory(
+    Map<String, List<double>>? previousHistory,
+    DashboardPayload payload,
+  ) {
+    final merged = <String, List<double>>{};
+
+    if (previousHistory != null) {
+      for (final entry in previousHistory.entries) {
+        merged[entry.key] = List<double>.from(entry.value);
+      }
+    }
+
+    for (final variable in payload.variables) {
+      final tag = variable.tag.trim();
+      if (tag.isEmpty || variable.value == null) {
+        continue;
+      }
+      final history = merged.putIfAbsent(tag, () => <double>[]);
+      history.add(variable.value!);
+      if (history.length > _maxHistoryPointsPerVariable) {
+        final overflow = history.length - _maxHistoryPointsPerVariable;
+        history.removeRange(0, overflow);
+      }
+    }
+
+    return merged;
+  }
+
+  AtalayaAlert? _resolveLatestIncomingAlert(List<AtalayaAlert> alerts, Set<String> newAlertIds) {
+    for (final alert in alerts) {
+      if (newAlertIds.contains(alert.id)) {
+        return alert;
+      }
+    }
+    return null;
   }
 
   Set<String> _collectNewAlertIds(List<AtalayaAlert> alerts) {
