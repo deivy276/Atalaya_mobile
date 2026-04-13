@@ -12,13 +12,23 @@ from sqlalchemy.orm import Session
 from .auth import (
     AuthUser,
     LoginRequest,
+    UserActivationRequest,
+    UserAdminOut,
+    UserCreateRequest,
+    UserRoleUpdateRequest,
     UserOut,
     authenticate_user,
     clear_session_cookie,
+    create_user,
     create_session_cookie,
     init_auth_db,
+    list_users,
+    record_logout,
     require_authenticated_if_enabled,
     require_roles_if_enabled,
+    set_user_activation,
+    set_user_role,
+    validate_auth_runtime_security,
 )
 from .config import get_settings
 from .database import BackendConfigurationError, get_db
@@ -47,6 +57,7 @@ app.add_middleware(
 
 @app.on_event('startup')
 def startup_init_auth() -> None:
+    validate_auth_runtime_security()
     init_auth_db()
 
 
@@ -297,8 +308,12 @@ def login(payload: LoginRequest, response: Response) -> UserOut:
 
 
 @app.post('/auth/logout')
-def logout(response: Response) -> dict[str, str]:
+def logout(
+    response: Response,
+    user: AuthUser | None = Depends(require_authenticated_if_enabled),
+) -> dict[str, str]:
     clear_session_cookie(response)
+    record_logout(user)
     return {'status': 'ok'}
 
 
@@ -307,3 +322,40 @@ def me(user: AuthUser | None = Depends(require_authenticated_if_enabled)) -> Use
     if user is None:
         return UserOut(username='anonymous', role='operator')
     return UserOut(username=user.username, role=user.role)
+
+
+@app.get('/auth/users', response_model=list[UserAdminOut])
+def auth_users(_: AuthUser | None = Depends(require_roles_if_enabled('admin'))) -> list[UserAdminOut]:
+    return list_users()
+
+
+@app.post('/auth/users', response_model=UserAdminOut, status_code=status.HTTP_201_CREATED)
+def auth_create_user(
+    payload: UserCreateRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+) -> UserAdminOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return create_user(actor, payload)
+
+
+@app.patch('/auth/users/{username}/role', response_model=UserAdminOut)
+def auth_update_role(
+    username: str,
+    payload: UserRoleUpdateRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+) -> UserAdminOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return set_user_role(actor, username, payload.role)
+
+
+@app.patch('/auth/users/{username}/activation', response_model=UserAdminOut)
+def auth_update_activation(
+    username: str,
+    payload: UserActivationRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+) -> UserAdminOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return set_user_activation(actor, username, payload.is_active)
