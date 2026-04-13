@@ -48,6 +48,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test\run_stress_simulation.ps
 > Para suite completa: `flutter analyze && flutter test`.
 
 Última acta de corrida local: `docs/test-plan/LAST_LOCAL_VALIDATION.md`.
+> `run_smoke_backend.ps1` valida checks DB y, si HTTP backend está activo en `127.0.0.1:8010`, también ejecuta el check API v32.
+> `run_stress_simulation.ps1` requiere backend HTTP activo en `127.0.0.1:8010`.
+
 
 
 ### Solución de problemas frecuentes (Windows)
