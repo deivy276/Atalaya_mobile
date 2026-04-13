@@ -51,7 +51,14 @@ Si `git pull` falla con:
 
 `The following untracked working tree files would be overwritten by merge: test/widget_test.dart`
 
-ejecuta:
+ejecuta (sin depender de scripts nuevos):
+
+```powershell
+Remove-Item .\test\widget_test.dart -Force -ErrorAction SilentlyContinue
+git pull
+```
+
+Opcional (si ya existe en tu rama):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\test\fix_git_pull_untracked.ps1
