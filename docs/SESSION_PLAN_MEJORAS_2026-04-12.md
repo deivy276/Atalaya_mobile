@@ -142,87 +142,24 @@ Con muestras antiguas (ej. >24h), el cálculo de estado marca `STALE` por diseñ
 2. Implementar Fase A.1 (`/health/details`) y Fase B.2 (`latest_sample_age_seconds`).
 3. Documentar setup en `docs/SETUP_WINDOWS_BACKEND.md`.
 
----
+# Atalaya Mobile — Bitácora de sesión y plan de mejoras
 
-## 7) Nuevos requerimientos solicitados (distribución multiusuario)
+Fecha: 2026-04-12
 
-Los siguientes puntos quedan incorporados al plan de mejora y priorización:
+## 1) Resumen de la sesión
 
-### RQ-01 — Control de acceso con usuarios y contraseñas (Alta)
+Durante esta sesión se atendieron tres frentes:
 
-Objetivo: habilitar distribución segura de Atalaya Mobile a múltiples usuarios.
+1. **Error inicial 503 en dashboard (frontend web)**
+   - Se confirmó que la app cargaba, pero mostraba error por respuesta `503` del backend.
+   - Se ajustó el frontend para no caer en pantalla bloqueante y mostrar estado degradado con mensaje amigable.
 
-Alcance propuesto:
-- Autenticación con usuario/contraseña (login backend).
-- Sesión con JWT (access + refresh token).
-- Control de roles base (Admin, Operaciones, Consulta).
-- Política de contraseñas y bloqueo por intentos fallidos.
-- Registro de auditoría (inicio de sesión, cierre, cambios de contraseña).
+2. **Carga de variables de entorno en backend FastAPI**
+   - Se detectó fragilidad en la lectura de `.env` por ruta relativa.
+   - Se corrigió configuración para priorizar `backend_fastapi/.env`.
+   - Se agregó `backend_fastapi/.env.example` para guiar la configuración local.
 
-Entregables:
-1. Endpoints de auth en FastAPI (`/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`).
-2. Tabla de usuarios/roles/permisos.
-3. Pantalla de login en Flutter y guardado seguro de tokens.
-4. Protección de endpoints existentes de dashboard/trends/alerts.
-
-### RQ-02 — Integración completa con Atalaya Predictor (Alta)
-
-Objetivo: además de trends, mostrar alertas, comentarios y adjuntos originados en Predictor.
-
-Alcance propuesto:
-- Feed de alertas con severidad, estado y timestamp.
-- Comentarios asociados por alerta (timeline conversacional).
-- Descarga/visualización de adjuntos subidos por usuarios de Predictor.
-- Sincronización incremental (polling optimizado y/o websocket en fase 2).
-- Nueva sección de “Gráficas especiales” configurable por pozo/job.
-
-Entregables:
-1. Contrato API unificado para alertas/comentarios/adjuntos.
-2. Nuevos modelos Flutter y providers de estado.
-3. UI de alertas enriquecida + pantalla de gráficas especiales.
-4. Manejo de errores de adjuntos (host permitido, expiración URL, fallback).
-
-### RQ-03 — Mejora de visualización y reordenamiento manual de variables (Media-Alta)
-
-Objetivo: mejorar ergonomía visual y permitir personalización del tablero por usuario.
-
-Alcance propuesto:
-- Rediseño visual de tarjetas de variables (jerarquía, contraste, estados).
-- Modo edición para mover tarjetas con drag & drop.
-- Persistencia del layout por usuario/dispositivo.
-- Acción “restablecer layout por defecto”.
-
-Entregables:
-1. Grid reordenable con guardado local/remoto.
-2. Modelo de preferencias de layout por usuario.
-3. Guía visual de estados (normal/warn/critical/stale/offline).
-
-### RQ-04 — Corrección de cambio de unidades (Alta)
-
-Objetivo: asegurar conversiones consistentes, trazables y estables por variable.
-
-Alcance propuesto:
-- Revisar factor de conversión y redondeo por tipo de variable.
-- Unificar origen de verdad de unidades (backend + catálogo en app).
-- Persistir preferencia por usuario y por variable/tag.
-- Corregir actualización de valor convertido en tiempo real y en trends.
-- Cobertura de pruebas unitarias de conversiones clave.
-
-Entregables:
-1. Matriz de conversiones validada con negocio.
-2. Refactor de `unit_converter` y controladores de preferencia.
-3. Test unitarios para conversiones y regresiones.
-4. Checklist QA funcional (dashboard + trend + alert detail).
-
-### Orden recomendado de implementación
-
-1. **RQ-01 (Auth)** y **RQ-04 (Unidades)** en paralelo (fundación de seguridad + exactitud).
-2. **RQ-02 (Predictor completo)** sobre APIs autenticadas.
-3. **RQ-03 (UX + reordenamiento manual)** como cierre de experiencia de usuario.
-
-### Criterios de aceptación globales de esta fase
-
-- Solo usuarios autenticados acceden a datos operativos.
-- Alertas/comentarios/adjuntos visibles y consistentes con Predictor.
-- Usuario puede personalizar el orden de variables y conservarlo.
-- Conversiones de unidades coinciden con referencia operativa y no presentan saltos inconsistentes.
+3. **Estado `STALE` persistente**
+   - Se validó que ya existe captura de datos del pozo.
+   - El estado `STALE` se debe a antigüedad real de muestra vs umbral de staleness.
+   - Se recomendó calibrar `STALE_THRESHOLD_SECONDS` según cadencia real de telemetría.
