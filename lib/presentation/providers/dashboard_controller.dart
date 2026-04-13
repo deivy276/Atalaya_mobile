@@ -171,23 +171,40 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
       );
       state = AsyncData(next);
       return next;
-    } catch (error, stackTrace) {
+    } catch (error) {
       _retryCount += 1;
       _consecutiveFailures += 1;
+      final friendlyError = _toFriendlyErrorMessage(error);
       if (previous != null) {
         final fallback = previous.copyWith(
           connectionStatus: _retryCount >= 5 ? ConnectionStatus.offline : ConnectionStatus.retrying,
           isRefreshing: false,
-          errorMessage: error.toString(),
+          errorMessage: friendlyError,
         );
         state = AsyncData(fallback);
         return fallback;
       }
-      state = AsyncError(error, stackTrace);
-      rethrow;
+      final fallback = DashboardViewState.fromPayload(
+        DashboardPayload.empty(),
+        connectionStatus: ConnectionStatus.offline,
+        errorMessage: friendlyError,
+      );
+      state = AsyncData(fallback);
+      return fallback;
     } finally {
       _refreshInFlight = false;
     }
+  }
+
+  String _toFriendlyErrorMessage(Object error) {
+    final raw = error.toString();
+    if (raw.contains('503')) {
+      return 'El backend respondió con error 503. Verifica que FastAPI tenga acceso a la base de datos y vuelve a intentar.';
+    }
+    if (raw.contains('No se pudo conectar')) {
+      return raw;
+    }
+    return 'No fue posible actualizar el dashboard en este momento. Reintenta en unos segundos.';
   }
 
   ConnectionStatus _deriveStatus(
