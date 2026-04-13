@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import html
 import re
@@ -181,6 +181,7 @@ class AtalayaDataRepository:
             well=core.well,
             job=core.job,
             latestSampleAt=core.latestSampleAt,
+            latestSampleAgeSeconds=core.latestSampleAgeSeconds,
             staleThresholdSeconds=core.staleThresholdSeconds,
             variables=core.variables,
             alerts=alerts_payload.alerts,
@@ -245,14 +246,61 @@ class AtalayaDataRepository:
             (item.sampleAt for item in variables if item.sampleAt is not None),
             default=None,
         )
+        latest_sample_age_seconds = self._compute_age_seconds(latest_sample_at)
 
         return DashboardCoreOut(
             well=well,
             job=job,
             latestSampleAt=latest_sample_at,
+            latestSampleAgeSeconds=latest_sample_age_seconds,
             staleThresholdSeconds=settings.stale_threshold_seconds,
             variables=variables,
         )
+
+    def fetch_latest_sample_info(self) -> tuple[datetime | None, int | None, str]:
+        latest_sample_at: datetime | None = None
+        source = 'NONE'
+
+        summary_meta = self._latest_samples_summary_meta()
+        if summary_meta is not None:
+            row = self.db.execute(
+                text(
+                    f"""
+                    SELECT MAX({self._qid(summary_meta.created_at_col)}) AS latest_sample_at
+                    FROM {self._qtable(summary_meta.schema, summary_meta.table)}
+                    """
+                )
+            ).mappings().first()
+            candidate = row.get('latest_sample_at') if row else None
+            if isinstance(candidate, datetime):
+                latest_sample_at = candidate
+                source = 'MATVIEW'
+
+        if latest_sample_at is None:
+            sample_meta = self._sample_table_meta()
+            if sample_meta is not None and sample_meta.created_at_col is not None:
+                row = self.db.execute(
+                    text(
+                        f"""
+                        SELECT MAX({self._qid(sample_meta.created_at_col)}) AS latest_sample_at
+                        FROM {self._qtable(sample_meta.schema, sample_meta.table)}
+                        """
+                    )
+                ).mappings().first()
+                candidate = row.get('latest_sample_at') if row else None
+                if isinstance(candidate, datetime):
+                    latest_sample_at = candidate
+                    source = 'BASE_TABLE'
+
+        return latest_sample_at, self._compute_age_seconds(latest_sample_at), source
+
+    @staticmethod
+    def _compute_age_seconds(sample_at: datetime | None) -> int | None:
+        if sample_at is None:
+            return None
+        now = datetime.now(tz=sample_at.tzinfo) if sample_at.tzinfo else datetime.now(timezone.utc).replace(tzinfo=None)
+        age_seconds = int((now - sample_at).total_seconds())
+        return max(age_seconds, 0)
 
     def fetch_trend(self, tag: str, range_value: str) -> TrendResponseOut:
         normalized_tag = self._norm_tag(tag)
