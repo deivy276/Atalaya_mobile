@@ -196,7 +196,7 @@ class TrendChartWidget extends StatelessWidget {
             enabled: true,
             handleBuiltInTouches: true,
             touchTooltipData: LineTouchTooltipData(
-              getTooltipColor: (_) => ProPalette.card.withOpacity(0.92),
+              getTooltipColor: (_) => ProPalette.card.withValues(alpha: 0.92),
               tooltipBorderRadius: BorderRadius.circular(8),
               fitInsideHorizontally: true,
               fitInsideVertically: true,

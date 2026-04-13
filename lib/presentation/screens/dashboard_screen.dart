@@ -34,10 +34,8 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Atalaya Mobile',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
+        titleSpacing: 8,
+        title: const _AtalayaBrand(),
         actions: <Widget>[
           Builder(
             builder: (context) => IconButton(
@@ -61,6 +59,7 @@ class DashboardScreen extends ConsumerWidget {
         ],
       ),
       endDrawer: const _HelpersDrawer(),
+      bottomNavigationBar: _PredictorAlertBar(dashboardAsync: dashboardAsync),
       body: dashboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _DashboardErrorState(
@@ -70,11 +69,15 @@ class DashboardScreen extends ConsumerWidget {
         data: (viewState) {
           final payload = viewState.payload;
           final variables = _normalizeTo12Slots(payload.variables);
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 700;
+              final crossAxisCount = constraints.maxWidth < 500 ? 1 : (constraints.maxWidth < 920 ? 2 : 3);
 
-          return RefreshIndicator(
+              return RefreshIndicator(
             color: ProPalette.accent,
             onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
-            child: CustomScrollView(
+                child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: <Widget>[
                 SliverPadding(
@@ -110,6 +113,8 @@ class DashboardScreen extends ConsumerWidget {
                           job: payload.job,
                           unitPreferences: unitPrefs,
                           health: _variableHealth(variable, payload),
+                          sparklinePoints: viewState.variableHistoryByTag[variable.tag] ?? const <double>[],
+                          kpSeverity: _kpSeverityForVariable(variable, payload.alerts),
                           onTap: () => _openTrendBottomSheet(
                             context: context,
                             ref: ref,
@@ -120,11 +125,11 @@ class DashboardScreen extends ConsumerWidget {
                       },
                       childCount: variables.length,
                     ),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.05,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: isCompact ? 2.2 : 1.15,
                     ),
                   ),
                 ),
@@ -203,11 +208,33 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
               ],
-            ),
+                ),
+              );
+            },
           );
         },
       ),
     );
+  }
+
+  AlertSeverity? _kpSeverityForVariable(WellVariable variable, List<AtalayaAlert> alerts) {
+    final tag = variable.tag.trim().toLowerCase();
+    final label = variable.label.trim().toLowerCase();
+    if (tag.isEmpty && label.isEmpty) {
+      return null;
+    }
+
+    AlertSeverity? match;
+    for (final alert in alerts) {
+      final description = alert.description.toLowerCase();
+      if ((tag.isNotEmpty && description.contains(tag)) ||
+          (label.isNotEmpty && description.contains(label))) {
+        if (match == null || alert.severity.rank > match.rank) {
+          match = alert.severity;
+        }
+      }
+    }
+    return match;
   }
 
   VariableHealth _variableHealth(WellVariable variable, DashboardPayload payload) {
@@ -286,6 +313,135 @@ class DashboardScreen extends ConsumerWidget {
           width: 520,
           height: 620,
           child: _AttachmentPreviewPanel(alert: alert),
+        ),
+      ),
+    );
+  }
+}
+
+class _AtalayaBrand extends StatelessWidget {
+  const _AtalayaBrand();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            gradient: const LinearGradient(
+              colors: <Color>[Color(0xFF00C6FF), Color(0xFF0072FF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: const Center(
+            child: Text(
+              'A',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          'Atalaya Mobile',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ],
+    );
+  }
+}
+
+class _PredictorAlertBar extends StatefulWidget {
+  const _PredictorAlertBar({required this.dashboardAsync});
+
+  final AsyncValue<DashboardViewState> dashboardAsync;
+
+  @override
+  State<_PredictorAlertBar> createState() => _PredictorAlertBarState();
+}
+
+class _PredictorAlertBarState extends State<_PredictorAlertBar> {
+  bool _expanded = false;
+
+  @override
+  void didUpdateWidget(covariant _PredictorAlertBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final latestIncoming = widget.dashboardAsync.asData?.value.latestIncomingAlert;
+    if (latestIncoming != null && !_expanded) {
+      setState(() => _expanded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewState = widget.dashboardAsync.asData?.value;
+    final latestIncoming = viewState?.latestIncomingAlert;
+    final alerts = viewState?.payload.alerts ?? const <AtalayaAlert>[];
+
+    final message = latestIncoming?.description ?? (alerts.isEmpty ? 'Sin alertas recientes' : alerts.first.description);
+    final severity = latestIncoming?.severity ?? (alerts.isEmpty ? AlertSeverity.ok : alerts.first.severity);
+
+    final borderColor = switch (severity) {
+      AlertSeverity.critical => ProPalette.danger,
+      AlertSeverity.attention => ProPalette.warn,
+      AlertSeverity.ok => ProPalette.ok,
+    };
+
+    return SafeArea(
+      top: false,
+      child: GestureDetector(
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: _expanded ? 12 : 10),
+          decoration: BoxDecoration(
+            color: ProPalette.panel,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor.withValues(alpha: 0.85)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(Icons.notifications_active_outlined, color: borderColor, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      alerts.isEmpty ? 'Sin alertas recientes' : 'Alertas del Predictor',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                    ),
+                  ),
+                  Icon(_expanded ? Icons.expand_more : Icons.expand_less, color: ProPalette.muted),
+                ],
+              ),
+              if (_expanded) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(color: ProPalette.text, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                if (severity != AlertSeverity.ok) ...<Widget>[
+                  const SizedBox(height: 4),
+                  Text(
+                    severity == AlertSeverity.critical
+                        ? 'Recomendación: reducir carga de operación y validar parámetros críticos.'
+                        : 'Recomendación: revisar tendencia y ajustar gradualmente parámetros de control.',
+                    style: const TextStyle(color: ProPalette.muted, fontSize: 11),
+                  ),
+                ],
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -594,7 +750,7 @@ class _TrendBottomSheet extends ConsumerWidget {
                   SizedBox(
                     width: 180,
                     child: DropdownButtonFormField<String>(
-                      value: unitOptions.contains(selectedPreference)
+                      initialValue: unitOptions.contains(selectedPreference)
                           ? selectedPreference
                           : (unitOptions.isEmpty ? null : unitOptions.first),
                       items: unitOptions

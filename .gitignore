@@ -39,3 +39,13 @@ venv/
 # Explicit sensitive file
 Token.txt
 **/Token.txt
+
+# Flutter / Dart build artifacts
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# This repository restores Flutter scaffolds dynamically; lockfile is regenerated locally.
+pubspec.lock
