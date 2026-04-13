@@ -20,16 +20,32 @@ from .auth import (
     UserRoleUpdateRequest,
     UserWellAccessUpdateRequest,
     UserOut,
+    PasswordChangeRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetTokenOut,
+    SessionOut,
+    SessionRevokeRequest,
+    MfaSetupOut,
+    MfaEnableRequest,
     authenticate_user,
     clear_session_cookie,
+    change_own_password,
+    consume_password_reset_token,
     create_user,
     create_session_cookie,
     get_user_well_access,
     init_auth_db,
+    issue_password_reset_token,
     list_permissions,
     list_roles,
+    list_active_sessions,
     list_users,
+    mfa_disable,
+    mfa_enable,
+    mfa_setup_secret,
     record_logout,
+    revoke_current_session,
+    revoke_session,
     require_authenticated_if_enabled,
     require_roles_if_enabled,
     set_user_activation,
@@ -313,19 +329,21 @@ def get_debug_sample_tags(
 
 @app.post('/auth/login', response_model=UserOut)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> UserOut:
-    user = authenticate_user(db, payload.username, payload.password)
+    user = authenticate_user(db, payload)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid credentials')
-    create_session_cookie(response, user)
+    create_session_cookie(db, response, user)
     return UserOut(username=user.username, role=user.role)
 
 
 @app.post('/auth/logout')
 def logout(
+    request: Request,
     response: Response,
     user: AuthUser | None = Depends(require_authenticated_if_enabled),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
+    revoke_current_session(db, request, reason='logout')
     clear_session_cookie(response)
     record_logout(db, user)
     return {'status': 'ok'}
@@ -416,3 +434,95 @@ def auth_set_user_well_access(
     if actor is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
     return set_user_well_access(db, actor, username, payload.wells)
+
+
+@app.post('/auth/change-password')
+def auth_change_password(
+    payload: PasswordChangeRequest,
+    user: AuthUser | None = Depends(require_authenticated_if_enabled),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    change_own_password(db, user, payload)
+    return {'status': 'ok'}
+
+
+@app.post('/auth/users/{username}/reset-password-token', response_model=PasswordResetTokenOut)
+def auth_issue_password_reset(
+    username: str,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> PasswordResetTokenOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return issue_password_reset_token(db, actor, username)
+
+
+@app.post('/auth/reset-password/confirm')
+def auth_confirm_password_reset(
+    payload: PasswordResetConfirmRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    consume_password_reset_token(db, payload)
+    return {'status': 'ok'}
+
+
+@app.get('/auth/sessions', response_model=list[SessionOut])
+def auth_list_sessions(
+    username: str | None = None,
+    actor: AuthUser | None = Depends(require_authenticated_if_enabled),
+    db: Session = Depends(get_db),
+) -> list[SessionOut]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    if username and actor.role not in {'admin', 'specialist'} and username.lower() != actor.username.lower():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return list_active_sessions(db, actor, username)
+
+
+@app.post('/auth/sessions/{session_id}/revoke')
+def auth_revoke_session(
+    session_id: str,
+    payload: SessionRevokeRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    revoke_session(db, actor, session_id, payload.reason)
+    return {'status': 'ok'}
+
+
+@app.post('/auth/mfa/setup', response_model=MfaSetupOut)
+def auth_mfa_setup(
+    user: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> MfaSetupOut:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    return mfa_setup_secret(db, user)
+
+
+@app.post('/auth/mfa/enable')
+def auth_mfa_enable(
+    payload: MfaEnableRequest,
+    user: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    mfa_enable(db, user, payload.otp_code)
+    return {'status': 'ok'}
+
+
+@app.post('/auth/mfa/disable/{username}')
+def auth_mfa_disable(
+    username: str,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    mfa_disable(db, actor, username)
+    return {'status': 'ok'}

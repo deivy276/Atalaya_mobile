@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from fastapi import HTTPException
 
 from backend_fastapi.app import auth
-from backend_fastapi.app.auth import validate_auth_runtime_security
+from backend_fastapi.app.auth import _totp_now, _verify_totp, validate_auth_runtime_security
 
 
 class AuthSecurityTests(unittest.TestCase):
@@ -35,11 +35,16 @@ class AuthSecurityTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             validate_auth_runtime_security()
 
-    def test_rbac_seed_is_executed(self) -> None:
+    def test_rbac_and_phase3_schema_seed_is_executed(self) -> None:
         db = MagicMock()
         auth.init_auth_db(db)
         self.assertTrue(db.execute.called)
         self.assertTrue(db.commit.called)
+
+    def test_totp_generation_and_verification(self) -> None:
+        secret = auth._base32_secret()
+        otp = _totp_now(secret)
+        self.assertTrue(_verify_totp(secret, otp))
 
 
 if __name__ == '__main__':

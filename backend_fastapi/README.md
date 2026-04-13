@@ -46,6 +46,17 @@ Se agregó una capa de autenticación basada en cookie de sesión para proteger 
 - Scope por pozo:
   - `GET /auth/users/{username}/well-access` (admin/specialist)
   - `PUT /auth/users/{username}/well-access` (solo admin)
+- Ciclo de credenciales (Fase 3):
+  - `POST /auth/change-password` (cambio de contraseña autenticado)
+  - `POST /auth/users/{username}/reset-password-token` (admin)
+  - `POST /auth/reset-password/confirm` (token temporal)
+- Sesiones y revocación:
+  - `GET /auth/sessions`
+  - `POST /auth/sessions/{session_id}/revoke`
+- MFA opcional (admin/specialist):
+  - `POST /auth/mfa/setup`
+  - `POST /auth/mfa/enable`
+  - `POST /auth/mfa/disable/{username}` (solo admin)
 - Timeout de sesión: `AUTH_SESSION_TIMEOUT_HOURS` (recomendado 8-12 horas en operación).
 - Hash de contraseñas: se usa `werkzeug.security.generate_password_hash` y `check_password_hash` (nunca texto plano).
 - Política de contraseña mínima (configurable): longitud (`AUTH_PASSWORD_MIN_LENGTH`, default 12), complejidad (mayúscula/minúscula/número/símbolo) y lista prohibida (`AUTH_BANNED_PASSWORDS`).
@@ -55,6 +66,8 @@ Se agregó una capa de autenticación basada en cookie de sesión para proteger 
   - `operator`: consumo de telemetría/KPs sin privilegios de administración.
 - Auditoría mínima en PostgreSQL (`auth_audit_log`): login exitoso/fallido, logout, alta/baja de usuario y cambio de rol.
 - La autenticación ya no depende de SQLite local: usa tablas en PostgreSQL (`users`, `roles`, `permissions`, `role_permissions`, `user_well_access`).
+- Se guarda session store en DB (`auth_sessions`) para revocación remota por riesgo (robo/pérdida).
+- Reset de contraseña usa token temporal (`password_reset_tokens`) con expiración corta y revoca sesiones activas al confirmar.
 
 Bootstrap local de usuario admin:
 
