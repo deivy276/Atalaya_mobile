@@ -6,6 +6,6 @@ void main() {
     (tester) async {
       // Placeholder: implementar al introducir modo edición + drag handle.
     },
-    skip: 'Pendiente implementación de layout reordenable y persistencia.',
+    skip: true, // TODO: habilitar al implementar layout reordenable.
   );
 }

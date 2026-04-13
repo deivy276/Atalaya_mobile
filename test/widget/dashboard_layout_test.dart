@@ -13,6 +13,6 @@ void main() {
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.byType(AppBar), findsOneWidget);
     },
-    skip: 'Habilitar cuando se inyecten providers de prueba para DashboardScreen.',
+    skip: true, // TODO: habilitar cuando existan providers de prueba.
   );
 }

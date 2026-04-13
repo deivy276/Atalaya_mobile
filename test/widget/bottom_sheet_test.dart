@@ -6,6 +6,6 @@ void main() {
     (tester) async {
       // Placeholder: requiere harness con payload mock y navegación.
     },
-    skip: 'Pendiente harness de UI para bottom sheets.',
+    skip: true, // TODO: habilitar con harness de UI para bottom sheets.
   );
 }
