@@ -15,6 +15,7 @@ import '../providers/unit_preferences_controller.dart';
 import '../widgets/trend_chart_widget.dart';
 import '../widgets/v2/brand_top_bar.dart';
 import '../widgets/v2/kpi_tile_v2.dart';
+import '../widgets/v2/layout_summary_chips.dart';
 import '../widgets/v2/predictor_alerts_dock.dart';
 import '../widgets/v2/well_overview_card.dart';
 
@@ -112,10 +113,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(top: 10, bottom: 12),
-                child: _LayoutSummaryChips(
+                child: LayoutSummaryChips(
                   tileCount: uiModel.tiles.length,
-                  densityMode: _densityMode,
-                  layoutMode: _tileLayoutMode,
+                  densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
+                  layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                 ),
               ),
             ),
@@ -185,10 +186,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 10, bottom: 12),
-                      child: _LayoutSummaryChips(
+                      child: LayoutSummaryChips(
                         tileCount: uiModel.tiles.length,
-                        densityMode: _densityMode,
-                        layoutMode: _tileLayoutMode,
+                        densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
+                        layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                       ),
                     ),
                   ),
@@ -858,59 +859,6 @@ class _EmptyKpiState extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _LayoutSummaryChips extends StatelessWidget {
-  const _LayoutSummaryChips({
-    required this.tileCount,
-    required this.densityMode,
-    required this.layoutMode,
-  });
-
-  final int tileCount;
-  final _DensityMode densityMode;
-  final _TileLayoutMode layoutMode;
-
-  @override
-  Widget build(BuildContext context) {
-    final densityLabel = densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo';
-    final layoutLabel = layoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista';
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: <Widget>[
-        _ChipLabel(text: '$tileCount variables'),
-        _ChipLabel(text: 'Densidad: $densityLabel'),
-        _ChipLabel(text: 'Vista: $layoutLabel'),
-      ],
-    );
-  }
-}
-
-class _ChipLabel extends StatelessWidget {
-  const _ChipLabel({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: LayoutTokens.textSecondary,
-          fontSize: 12,
-        ),
       ),
     );
   }
