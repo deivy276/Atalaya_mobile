@@ -11,6 +11,8 @@ class LayoutSummaryChips extends StatelessWidget {
     this.onTapDensity,
     this.onTapLayout,
     this.onTapReset,
+    this.statusText,
+    this.statusColor,
   });
 
   final int tileCount;
@@ -19,6 +21,8 @@ class LayoutSummaryChips extends StatelessWidget {
   final VoidCallback? onTapDensity;
   final VoidCallback? onTapLayout;
   final VoidCallback? onTapReset;
+  final String? statusText;
+  final Color? statusColor;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +30,12 @@ class LayoutSummaryChips extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: <Widget>[
+        if (statusText != null)
+          _ChipLabel(
+            text: statusText!,
+            icon: Icons.radio_button_checked_rounded,
+            textColor: statusColor ?? LayoutTokens.textSecondary,
+          ),
         _ChipLabel(text: '$tileCount variables'),
         _ChipLabel(
           text: 'Densidad: $densityLabel',
@@ -56,12 +66,14 @@ class _ChipLabel extends StatelessWidget {
     this.icon,
     this.onTap,
     this.semanticLabel,
+    this.textColor,
   });
 
   final String text;
   final IconData? icon;
   final VoidCallback? onTap;
   final String? semanticLabel;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -92,8 +104,8 @@ class _ChipLabel extends StatelessWidget {
                       icon,
                       size: 14,
                       color: onTap == null
-                          ? LayoutTokens.textMuted
-                          : LayoutTokens.textSecondary,
+                          ? (textColor ?? LayoutTokens.textMuted)
+                          : (textColor ?? LayoutTokens.textSecondary),
                     ),
                     const SizedBox(width: 6),
                   ],
@@ -101,8 +113,8 @@ class _ChipLabel extends StatelessWidget {
                     text,
                     style: TextStyle(
                       color: onTap == null
-                          ? LayoutTokens.textMuted
-                          : LayoutTokens.textSecondary,
+                          ? (textColor ?? LayoutTokens.textMuted)
+                          : (textColor ?? LayoutTokens.textSecondary),
                       fontSize: 12,
                     ),
                   ),
