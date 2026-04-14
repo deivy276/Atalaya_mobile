@@ -616,26 +616,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       style: const TextStyle(color: LayoutTokens.textMuted),
                     ),
                     const SizedBox(height: 2),
-                    Semantics(
-                      label: 'Estado actual $currentStatus con $currentTileCount variables visibles',
-                      child: Row(
-                        children: <Widget>[
-                          Icon(
-                            Icons.circle,
-                            size: 10,
-                            color: currentStatusColor,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'Estado: $currentStatus · Variables: $currentTileCount',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: LayoutTokens.textMuted),
-                            ),
-                          ),
-                        ],
-                      ),
+                    _ControlsStatusSummary(
+                      currentStatus: currentStatus,
+                      currentTileCount: currentTileCount,
+                      currentStatusColor: currentStatusColor,
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -992,6 +976,43 @@ class _CompactControlsHint extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ControlsStatusSummary extends StatelessWidget {
+  const _ControlsStatusSummary({
+    required this.currentStatus,
+    required this.currentTileCount,
+    required this.currentStatusColor,
+  });
+
+  final String currentStatus;
+  final int currentTileCount;
+  final Color currentStatusColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Estado actual $currentStatus con $currentTileCount variables visibles',
+      child: Row(
+        children: <Widget>[
+          Icon(
+            Icons.circle,
+            size: 10,
+            color: currentStatusColor,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Estado: $currentStatus · Variables: $currentTileCount',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: LayoutTokens.textMuted),
+            ),
+          ),
+        ],
       ),
     );
   }
