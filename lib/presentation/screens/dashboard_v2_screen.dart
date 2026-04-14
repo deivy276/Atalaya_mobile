@@ -35,6 +35,9 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   _DensityMode _densityMode = _DensityMode.comfortable;
   _TileLayoutMode _tileLayoutMode = _TileLayoutMode.grid;
 
+  bool get _isDefaultLayoutConfig =>
+      _densityMode == _DensityMode.comfortable && _tileLayoutMode == _TileLayoutMode.grid;
+
   @override
   void initState() {
     super.initState();
@@ -121,10 +124,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                   layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                   onTapDensity: () => _openLayoutControls(),
                   onTapLayout: () => _openLayoutControls(),
-                  onTapReset: _densityMode == _DensityMode.comfortable &&
-                          _tileLayoutMode == _TileLayoutMode.grid
-                      ? null
-                      : () => _confirmAndResetLayout(),
+                  onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
                 ),
               ),
             ),
@@ -201,10 +201,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                         layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                         onTapDensity: () => _openLayoutControls(),
                         onTapLayout: () => _openLayoutControls(),
-                        onTapReset: _densityMode == _DensityMode.comfortable &&
-                                _tileLayoutMode == _TileLayoutMode.grid
-                            ? null
-                            : () => _confirmAndResetLayout(),
+                        onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
                       ),
                     ),
                   ),
