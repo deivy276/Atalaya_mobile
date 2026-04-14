@@ -885,6 +885,62 @@ class AtalayaDataRepository:
 
         return []
 
+    def _fetch_latest_samples_by_tag_normalized(
+        self,
+        sample_meta: SampleTableMeta,
+        missing_tags: list[str],
+    ) -> list[dict[str, Any]]:
+        if not missing_tags or sample_meta.tag_col is None or sample_meta.value_col is None:
+            return []
+
+        tag_sql = self._qid(sample_meta.tag_col)
+        value_sql = self._qid(sample_meta.value_col)
+        created_sql = self._qid(sample_meta.created_at_col) if sample_meta.created_at_col else 'NULL::timestamptz'
+
+        if sample_meta.created_at_col:
+            try:
+                stmt = text(
+                    f"""
+                    SELECT DISTINCT ON (LOWER(TRIM(TRAILING '.' FROM {tag_sql})))
+                           LOWER(TRIM(TRAILING '.' FROM {tag_sql})) AS tag_norm,
+                           {tag_sql} AS actual_tag,
+                           {value_sql} AS value,
+                           {created_sql} AS created_at
+                    FROM {self._qtable(sample_meta.schema, sample_meta.table)}
+                    WHERE LOWER(TRIM(TRAILING '.' FROM {tag_sql})) IN :tags
+                    ORDER BY LOWER(TRIM(TRAILING '.' FROM {tag_sql})), {self._qid(sample_meta.created_at_col)} DESC{', ' + self._qid(sample_meta.id_col) + ' DESC' if sample_meta.id_col else ''}
+                    """
+                ).bindparams(bindparam('tags', expanding=True))
+                rows = self.db.execute(stmt, {'tags': missing_tags}).mappings().all()
+                reduced = [dict(row) for row in rows]
+                if reduced:
+                    return reduced
+            except SQLAlchemyError:
+                pass
+
+        if sample_meta.id_col:
+            try:
+                stmt = text(
+                    f"""
+                    SELECT DISTINCT ON (LOWER(TRIM(TRAILING '.' FROM {tag_sql})))
+                           LOWER(TRIM(TRAILING '.' FROM {tag_sql})) AS tag_norm,
+                           {tag_sql} AS actual_tag,
+                           {value_sql} AS value,
+                           {created_sql} AS created_at
+                    FROM {self._qtable(sample_meta.schema, sample_meta.table)}
+                    WHERE LOWER(TRIM(TRAILING '.' FROM {tag_sql})) IN :tags
+                    ORDER BY LOWER(TRIM(TRAILING '.' FROM {tag_sql})), {self._qid(sample_meta.id_col)} DESC
+                    """
+                ).bindparams(bindparam('tags', expanding=True))
+                rows = self.db.execute(stmt, {'tags': missing_tags}).mappings().all()
+                reduced = [dict(row) for row in rows]
+                if reduced:
+                    return reduced
+            except SQLAlchemyError:
+                pass
+
+        return []
+
     def _fetch_latest_samples_from_summary(self, normalized_tags: list[str]) -> list[dict[str, Any]]:
         summary_meta = self._latest_samples_summary_meta()
         if summary_meta is None or not normalized_tags:
