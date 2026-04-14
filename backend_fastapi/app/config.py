@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     app_name: str = 'Atalaya FastAPI'
     api_prefix: str = '/api/v1'
     cors_origins_raw: str = Field(default='*', alias='CORS_ORIGINS')
+    max_request_size_bytes: int = Field(default=1048576, alias='MAX_REQUEST_SIZE_BYTES')
+    enforce_https_in_prod: bool = Field(default=True, alias='ENFORCE_HTTPS_IN_PROD')
+    rate_limit_auth_max_requests: int = Field(default=10, alias='RATE_LIMIT_AUTH_MAX_REQUESTS')
+    rate_limit_auth_window_seconds: int = Field(default=60, alias='RATE_LIMIT_AUTH_WINDOW_SECONDS')
+    rate_limit_sensitive_max_requests: int = Field(default=120, alias='RATE_LIMIT_SENSITIVE_MAX_REQUESTS')
+    rate_limit_sensitive_window_seconds: int = Field(default=60, alias='RATE_LIMIT_SENSITIVE_WINDOW_SECONDS')
 
     db_host: str = Field(default='', alias='DB_HOST')
     db_port: int = Field(default=5432, alias='DB_PORT')
@@ -41,11 +47,22 @@ class Settings(BaseSettings):
 
 
     auth_enabled: bool = Field(default=False, alias='AUTH_ENABLED')
+    app_env: str = Field(default='dev', alias='APP_ENV')
     auth_secret_key: str = Field(default='change-me-local-dev', alias='AUTH_SECRET_KEY')
+    auth_secret_key_dev: str = Field(default='', alias='AUTH_SECRET_KEY_DEV')
+    auth_secret_key_stage: str = Field(default='', alias='AUTH_SECRET_KEY_STAGE')
+    auth_secret_key_prod: str = Field(default='', alias='AUTH_SECRET_KEY_PROD')
     auth_cookie_name: str = Field(default='atalaya_session', alias='AUTH_COOKIE_NAME')
     auth_cookie_secure: bool = Field(default=False, alias='AUTH_COOKIE_SECURE')
+    auth_cookie_samesite: str = Field(default='lax', alias='AUTH_COOKIE_SAMESITE')
     auth_session_timeout_hours: int = Field(default=12, alias='AUTH_SESSION_TIMEOUT_HOURS')
-    auth_sqlite_path: str = Field(default='backend_fastapi/data/auth.db', alias='AUTH_SQLITE_PATH')
+    auth_password_min_length: int = Field(default=12, alias='AUTH_PASSWORD_MIN_LENGTH')
+    auth_login_max_attempts: int = Field(default=5, alias='AUTH_LOGIN_MAX_ATTEMPTS')
+    auth_login_lockout_minutes: int = Field(default=15, alias='AUTH_LOGIN_LOCKOUT_MINUTES')
+    auth_banned_passwords_raw: str = Field(
+        default='password,123456,123456789,qwerty,admin,letmein',
+        alias='AUTH_BANNED_PASSWORDS',
+    )
     bootstrap_admin_username: str = Field(default='admin', alias='BOOTSTRAP_ADMIN_USERNAME')
     bootstrap_admin_password: str = Field(default='', alias='BOOTSTRAP_ADMIN_PASSWORD')
 
@@ -75,6 +92,28 @@ class Settings(BaseSettings):
     def allowed_attachment_hosts(self) -> list[str]:
         raw = self.allowed_attachment_hosts_raw or ''
         return [item.strip().lower() for item in raw.split(',') if item.strip()]
+
+    @property
+    def auth_cookie_samesite_normalized(self) -> str:
+        normalized = (self.auth_cookie_samesite or 'lax').strip().lower()
+        if normalized not in {'lax', 'strict'}:
+            return 'lax'
+        return normalized
+
+    @property
+    def auth_banned_passwords(self) -> set[str]:
+        raw = self.auth_banned_passwords_raw or ''
+        return {item.strip().lower() for item in raw.split(',') if item.strip()}
+
+    @property
+    def auth_effective_secret_key(self) -> str:
+        env = (self.app_env or 'dev').strip().lower()
+        per_env = {
+            'dev': self.auth_secret_key_dev,
+            'stage': self.auth_secret_key_stage,
+            'prod': self.auth_secret_key_prod,
+        }.get(env, '')
+        return (per_env or self.auth_secret_key).strip()
 
     @property
     def database_config_error(self) -> str | None:
