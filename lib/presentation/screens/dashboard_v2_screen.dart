@@ -659,6 +659,13 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       },
                     ),
                     const SizedBox(height: 14),
+                    const Divider(color: LayoutTokens.dividerSubtle),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Acciones',
+                      style: TextStyle(color: LayoutTokens.textSecondary),
+                    ),
+                    const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
