@@ -120,6 +120,12 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                 padding: const EdgeInsets.only(top: 10, bottom: 12),
                 child: LayoutSummaryChips(
                   tileCount: uiModel.tiles.length,
+                  statusText: viewState.connectionStatus == ConnectionStatus.connected
+                      ? 'Estado: En línea'
+                      : 'Estado: Desactualizado',
+                  statusColor: viewState.connectionStatus == ConnectionStatus.connected
+                      ? LayoutTokens.accentGreen
+                      : LayoutTokens.accentOrange,
                   densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
                   layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                   onTapDensity: () => _openLayoutControls(),
@@ -197,6 +203,12 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       padding: const EdgeInsets.only(top: 10, bottom: 12),
                       child: LayoutSummaryChips(
                         tileCount: uiModel.tiles.length,
+                        statusText: viewState.connectionStatus == ConnectionStatus.connected
+                            ? 'Estado: En línea'
+                            : 'Estado: Desactualizado',
+                        statusColor: viewState.connectionStatus == ConnectionStatus.connected
+                            ? LayoutTokens.accentGreen
+                            : LayoutTokens.accentOrange,
                         densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
                         layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                         onTapDensity: () => _openLayoutControls(),
@@ -650,9 +662,11 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
-                        onPressed: () async {
-                          await _confirmAndResetLayout(closeControlsSheet: true);
-                        },
+                        onPressed: _isDefaultLayoutConfig
+                            ? null
+                            : () async {
+                                await _confirmAndResetLayout(closeControlsSheet: true);
+                              },
                         icon: const Icon(Icons.restart_alt_rounded),
                         label: const Text('Restablecer layout'),
                       ),
