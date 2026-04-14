@@ -36,7 +36,11 @@ class LayoutSummaryChips extends StatelessWidget {
             icon: Icons.radio_button_checked_rounded,
             textColor: statusColor ?? LayoutTokens.textSecondary,
           ),
-        _ChipLabel(text: '$tileCount variables'),
+        _ChipLabel(
+          text: '$tileCount variables',
+          icon: Icons.insights_rounded,
+          semanticLabel: 'Cantidad de variables visibles: $tileCount',
+        ),
         _ChipLabel(
           text: 'Densidad: $densityLabel',
           icon: Icons.tune_rounded,
