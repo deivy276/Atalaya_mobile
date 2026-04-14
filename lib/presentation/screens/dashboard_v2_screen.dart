@@ -120,7 +120,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                   layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                   onTapDensity: () => _openLayoutControls(),
                   onTapLayout: () => _openLayoutControls(),
-                  onTapReset: () => _resetLayoutPreferences(),
+                  onTapReset: () => _confirmAndResetLayout(),
                 ),
               ),
             ),
@@ -197,7 +197,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                         layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                         onTapDensity: () => _openLayoutControls(),
                         onTapLayout: () => _openLayoutControls(),
-                        onTapReset: () => _resetLayoutPreferences(),
+                        onTapReset: () => _confirmAndResetLayout(),
                       ),
                     ),
                   ),
@@ -361,6 +361,35 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_densityPrefKey);
     await prefs.remove(_layoutPrefKey);
+  }
+
+  Future<void> _confirmAndResetLayout({bool closeControlsSheet = false}) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Restablecer layout'),
+          content: const Text('¿Quieres volver a la configuración visual predeterminada?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Restablecer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _resetLayoutPreferences();
+      if (closeControlsSheet && context.mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   DashboardUiModel _buildUiModel(
@@ -609,10 +638,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
                         onPressed: () async {
-                          await _resetLayoutPreferences();
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
+                          await _confirmAndResetLayout(closeControlsSheet: true);
                         },
                         icon: const Icon(Icons.restart_alt_rounded),
                         label: const Text('Restablecer layout'),
