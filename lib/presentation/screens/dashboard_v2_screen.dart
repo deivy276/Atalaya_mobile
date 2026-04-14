@@ -579,6 +579,11 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     final currentStatus = dashboardState == null
         ? 'Sin datos'
         : (dashboardState.connectionStatus == ConnectionStatus.connected ? 'En línea' : 'Desactualizado');
+    final currentStatusColor = dashboardState == null
+        ? LayoutTokens.textMuted
+        : (dashboardState.connectionStatus == ConnectionStatus.connected
+            ? LayoutTokens.accentGreen
+            : LayoutTokens.accentOrange);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -611,9 +616,19 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       style: const TextStyle(color: LayoutTokens.textMuted),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      'Estado: $currentStatus · Variables: $currentTileCount',
-                      style: const TextStyle(color: LayoutTokens.textMuted),
+                    Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.circle,
+                          size: 10,
+                          color: currentStatusColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Estado: $currentStatus · Variables: $currentTileCount',
+                          style: const TextStyle(color: LayoutTokens.textMuted),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     const Text(
