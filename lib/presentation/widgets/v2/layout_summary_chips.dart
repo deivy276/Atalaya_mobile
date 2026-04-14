@@ -26,40 +26,47 @@ class LayoutSummaryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: <Widget>[
-        if (statusText != null)
-          _ChipLabel(
-            text: statusText!,
-            icon: Icons.radio_button_checked_rounded,
-            textColor: statusColor ?? LayoutTokens.textSecondary,
-          ),
-        _ChipLabel(
-          text: '$tileCount variables',
-          icon: Icons.insights_rounded,
-          semanticLabel: 'Cantidad de variables visibles: $tileCount',
-        ),
-        _ChipLabel(
-          text: 'Densidad: $densityLabel',
-          icon: Icons.tune_rounded,
-          onTap: onTapDensity,
-          semanticLabel: 'Cambiar densidad actual: $densityLabel',
-        ),
-        _ChipLabel(
-          text: 'Vista: $layoutLabel',
-          icon: Icons.grid_view_rounded,
-          onTap: onTapLayout,
-          semanticLabel: 'Cambiar vista actual: $layoutLabel',
-        ),
-        _ChipLabel(
-          text: 'Restablecer',
-          icon: Icons.restart_alt_rounded,
-          onTap: onTapReset,
-          semanticLabel: 'Restablecer ajustes de layout',
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 420;
+
+        return Wrap(
+          spacing: compact ? 6 : 8,
+          runSpacing: compact ? 6 : 8,
+          children: <Widget>[
+            if (statusText != null)
+              _ChipLabel(
+                text: statusText!,
+                icon: Icons.radio_button_checked_rounded,
+                textColor: statusColor ?? LayoutTokens.textSecondary,
+                semanticLabel: 'Estado operativo: $statusText',
+              ),
+            _ChipLabel(
+              text: '$tileCount variables',
+              icon: Icons.insights_rounded,
+              semanticLabel: 'Cantidad de variables visibles: $tileCount',
+            ),
+            _ChipLabel(
+              text: compact ? densityLabel : 'Densidad: $densityLabel',
+              icon: Icons.tune_rounded,
+              onTap: onTapDensity,
+              semanticLabel: 'Cambiar densidad actual: $densityLabel',
+            ),
+            _ChipLabel(
+              text: compact ? layoutLabel : 'Vista: $layoutLabel',
+              icon: Icons.grid_view_rounded,
+              onTap: onTapLayout,
+              semanticLabel: 'Cambiar vista actual: $layoutLabel',
+            ),
+            _ChipLabel(
+              text: compact ? 'Reset' : 'Restablecer',
+              icon: Icons.restart_alt_rounded,
+              onTap: onTapReset,
+              semanticLabel: 'Restablecer ajustes de layout',
+            ),
+          ],
+        );
+      },
     );
   }
 }
