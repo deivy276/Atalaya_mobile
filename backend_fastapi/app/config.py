@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     auth_enabled: bool = Field(default=False, alias='AUTH_ENABLED')
     auth_skip_db_init: bool = Field(default=False, alias='AUTH_SKIP_DB_INIT')
     app_env: str = Field(default='dev', alias='APP_ENV')
-    auth_secret_key: str = Field(default='change-me-local-dev', alias='AUTH_SECRET_KEY')
+    auth_secret_key: str = Field(default='local-dev-secret-atalaya-rotate-in-prod', alias='AUTH_SECRET_KEY')
     auth_secret_key_dev: str = Field(default='', alias='AUTH_SECRET_KEY_DEV')
     auth_secret_key_stage: str = Field(default='', alias='AUTH_SECRET_KEY_STAGE')
     auth_secret_key_prod: str = Field(default='', alias='AUTH_SECRET_KEY_PROD')

@@ -3,6 +3,7 @@ from time import sleep
 
 import psycopg
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import get_settings
@@ -90,7 +91,22 @@ def _ensure_session_factory():
 
 def get_db() -> Generator[Session, None, None]:
     session_factory = _ensure_session_factory()
-    db = session_factory()
+    db: Session | None = None
+    attempts = max(1, int(settings.db_retry_attempts))
+    backoff_seconds = max(0, int(settings.db_retry_backoff_ms)) / 1000.0
+    for attempt in range(attempts):
+        candidate = session_factory()
+        try:
+            candidate.connection()
+            db = candidate
+            break
+        except OperationalError as exc:
+            candidate.close()
+            if not _is_transient_operational_error(exc) or attempt == attempts - 1:
+                raise
+            sleep(backoff_seconds * (2**attempt))
+    if db is None:
+        raise RuntimeError('Failed to initialize DB session.')
     try:
         yield db
     finally:
