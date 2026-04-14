@@ -9,6 +9,7 @@ except RuntimeError:
 
 os.environ['AUTH_SKIP_DB_INIT'] = 'true'
 os.environ['AUTH_ENABLED'] = 'false'
+os.environ['AUTH_SECRET_KEY'] = 'DevStrongSecret#12345'
 
 from backend_fastapi.app.database import get_db  # noqa: E402
 from backend_fastapi.app.main import app, settings  # noqa: E402
