@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -392,6 +393,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
     if (confirmed == true) {
       await _resetLayoutPreferences();
+      await HapticFeedback.lightImpact();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
