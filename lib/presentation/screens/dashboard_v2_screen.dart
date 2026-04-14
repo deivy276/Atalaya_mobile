@@ -674,14 +674,19 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: _isDefaultLayoutConfig
-                            ? null
-                            : () async {
-                                await _confirmAndResetLayout(closeControlsSheet: true);
-                              },
-                        icon: const Icon(Icons.restart_alt_rounded),
-                        label: const Text('Restablecer layout'),
+                      child: Tooltip(
+                        message: _isDefaultLayoutConfig
+                            ? 'No hay cambios para restablecer'
+                            : 'Restablecer a configuración predeterminada',
+                        child: TextButton.icon(
+                          onPressed: _isDefaultLayoutConfig
+                              ? null
+                              : () async {
+                                  await _confirmAndResetLayout(closeControlsSheet: true);
+                                },
+                          icon: const Icon(Icons.restart_alt_rounded),
+                          label: const Text('Restablecer layout'),
+                        ),
                       ),
                     ),
                     if (_isDefaultLayoutConfig)
