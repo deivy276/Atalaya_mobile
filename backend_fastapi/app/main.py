@@ -64,6 +64,7 @@ from .schemas import (
     AlertsListOut,
     AttachmentsResponseOut,
     DashboardCoreOut,
+    DashboardDiagnosticsOut,
     DashboardOut,
     HealthDetailsResponse,
     HealthResponse,
@@ -315,6 +316,26 @@ def get_dashboard(
     response.headers['X-Samples-Resolution-Ms'] = f'{repository.last_samples_resolution_ms:.1f}'
     response.headers['X-Samples-Fallback-Used'] = str(repository.last_samples_fallback_used).lower()
     return payload
+
+
+@app.get(f'{settings.api_prefix}/dashboard/diagnostics', response_model=DashboardDiagnosticsOut)
+def get_dashboard_diagnostics(
+    fresh: bool = Query(False, description='Bypass dashboard cache for diagnostics.'),
+    repository: AtalayaDataRepository = Depends(get_repository),
+    _: AuthUser | None = Depends(require_authenticated_if_enabled),
+) -> DashboardDiagnosticsOut:
+    payload = repository.fetch_dashboard(fresh=fresh)
+    configured_variables = sum(1 for item in payload.variables if item.configured)
+    return DashboardDiagnosticsOut(
+        cacheStatus=repository.last_dashboard_cache_status,
+        kpCacheStatus=repository.last_kp_cache_status,
+        samplesSource=repository.last_samples_source,
+        samplesMissingTags=repository.last_samples_missing_tags,
+        samplesMissingRatio=repository.last_samples_missing_ratio,
+        samplesResolutionMs=repository.last_samples_resolution_ms,
+        samplesFallbackUsed=repository.last_samples_fallback_used,
+        configuredVariables=configured_variables,
+    )
 
 
 @app.get(f'{settings.api_prefix}/dashboard/full', response_model=DashboardOut)

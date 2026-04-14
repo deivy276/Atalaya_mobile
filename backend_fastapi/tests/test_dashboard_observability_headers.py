@@ -101,6 +101,21 @@ class DashboardObservabilityHeaderTests(unittest.TestCase):
         self.assertEqual(response.headers.get('X-Samples-Resolution-Ms'), '4.2')
         self.assertEqual(response.headers.get('X-Samples-Fallback-Used'), 'false')
 
+    def test_dashboard_diagnostics_reports_samples_observability_fields(self) -> None:
+        with TestClient(app) as client:
+            response = client.get(f'{settings.api_prefix}/dashboard/diagnostics')
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get('cacheStatus'), 'MISS')
+        self.assertEqual(payload.get('kpCacheStatus'), 'MISS')
+        self.assertEqual(payload.get('samplesSource'), 'BASE_TABLE_NORM')
+        self.assertEqual(payload.get('samplesMissingTags'), 1)
+        self.assertEqual(payload.get('samplesMissingRatio'), 0.125)
+        self.assertEqual(payload.get('samplesResolutionMs'), 4.2)
+        self.assertEqual(payload.get('samplesFallbackUsed'), False)
+        self.assertEqual(payload.get('configuredVariables'), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

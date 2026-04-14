@@ -34,6 +34,13 @@ Cuando `X-Samples-Source=CACHE`, los campos de missing/fallback se reinician a
 valores neutros (`0`, `0.000`, `0.0`, `false`) para evitar arrastre de métricas
 de requests anteriores.
 
+Endpoint de diagnóstico rápido (sin depender de headers):
+
+- `GET /api/v1/dashboard/diagnostics`
+  - Devuelve `cacheStatus`, `kpCacheStatus`, `samplesSource`,
+    `samplesMissingTags`, `samplesMissingRatio`, `samplesResolutionMs`,
+    `samplesFallbackUsed`, y `configuredVariables`.
+
 ## Scripts SQL
 
 - Índices base: `sql/atalaya_v3_indexes.sql`
