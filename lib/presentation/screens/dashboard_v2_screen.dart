@@ -219,6 +219,12 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     String job,
     Map<String, String> unitPrefs,
   ) {
+    if (uiModel.tiles.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: _EmptyKpiState(),
+      );
+    }
+
     final itemBuilder = (BuildContext context, int index) {
       final model = uiModel.tiles[index];
       final variable = viewState.payload.variables.firstWhere((item) => item.tag == model.id);
@@ -804,6 +810,34 @@ class _SelectedVariableBanner extends StatelessWidget {
           Text(
             tile.deltaText,
             style: TextStyle(color: tile.accentColor, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyKpiState extends StatelessWidget {
+  const _EmptyKpiState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: LayoutTokens.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: LayoutTokens.dividerSubtle),
+      ),
+      child: const Row(
+        children: <Widget>[
+          Icon(Icons.insights_outlined, color: LayoutTokens.textSecondary),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'No hay variables disponibles para esta operación.',
+              style: TextStyle(color: LayoutTokens.textSecondary),
+            ),
           ),
         ],
       ),
