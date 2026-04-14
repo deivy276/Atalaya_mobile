@@ -616,23 +616,26 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       style: const TextStyle(color: LayoutTokens.textMuted),
                     ),
                     const SizedBox(height: 2),
-                    Row(
-                      children: <Widget>[
-                        Icon(
-                          Icons.circle,
-                          size: 10,
-                          color: currentStatusColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            'Estado: $currentStatus · Variables: $currentTileCount',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: LayoutTokens.textMuted),
+                    Semantics(
+                      label: 'Estado actual $currentStatus con $currentTileCount variables visibles',
+                      child: Row(
+                        children: <Widget>[
+                          Icon(
+                            Icons.circle,
+                            size: 10,
+                            color: currentStatusColor,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Estado: $currentStatus · Variables: $currentTileCount',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: LayoutTokens.textMuted),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     const Text(
