@@ -62,8 +62,10 @@ Se agregó una capa de autenticación basada en cookie de sesión para proteger 
 - Política de contraseña mínima (configurable): longitud (`AUTH_PASSWORD_MIN_LENGTH`, default 12), complejidad (mayúscula/minúscula/número/símbolo) y lista prohibida (`AUTH_BANNED_PASSWORDS`).
 - Bloqueo temporal por intentos fallidos: configurable con `AUTH_LOGIN_MAX_ATTEMPTS` y `AUTH_LOGIN_LOCKOUT_MINUTES`.
 - RBAC:
-  - `admin`: acceso total (incluye endpoints de debug).
-  - `operator`: consumo de telemetría/KPs sin privilegios de administración.
+  - `admin`: gestión de usuarios, roles y configuración global.
+  - `specialist`: ajustes de predictor/control panel.
+  - `operator`: visualiza telemetría/KPs y ejecuta acciones operativas permitidas.
+  - `viewer`: solo lectura.
 - Auditoría mínima en PostgreSQL (`auth_audit_log`): login exitoso/fallido, logout, alta/baja de usuario y cambio de rol.
 - La autenticación ya no depende de SQLite local: usa tablas en PostgreSQL (`users`, `roles`, `permissions`, `role_permissions`, `user_well_access`).
 - Se guarda session store en DB (`auth_sessions`) para revocación remota por riesgo (robo/pérdida).

@@ -40,6 +40,9 @@ class AuthSecurityTests(unittest.TestCase):
         auth.init_auth_db(db)
         self.assertTrue(db.execute.called)
         self.assertTrue(db.commit.called)
+        execute_calls = str(db.execute.call_args_list)
+        self.assertIn('predictor:write', execute_calls)
+        self.assertIn('operations:execute', execute_calls)
 
     def test_totp_generation_and_verification(self) -> None:
         secret = auth._base32_secret()
