@@ -1,6 +1,10 @@
 from time import perf_counter
+from time import sleep
 import traceback
 import json
+from collections import defaultdict, deque
+from threading import Lock
+from time import monotonic
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,13 +16,46 @@ from sqlalchemy.orm import Session
 from .auth import (
     AuthUser,
     LoginRequest,
+    UserActivationRequest,
+    UserAdminOut,
+    UserCreateRequest,
+    PermissionOut,
+    RoleOut,
+    UserRoleUpdateRequest,
+    UserWellAccessUpdateRequest,
     UserOut,
+    PasswordChangeRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetTokenOut,
+    SessionOut,
+    SessionRevokeRequest,
+    MfaSetupOut,
+    MfaEnableRequest,
     authenticate_user,
     clear_session_cookie,
+    change_own_password,
+    consume_password_reset_token,
+    create_user,
     create_session_cookie,
+    get_user_well_access,
     init_auth_db,
+    issue_password_reset_token,
+    list_permissions,
+    list_roles,
+    list_active_sessions,
+    list_users,
+    mfa_disable,
+    mfa_enable,
+    mfa_setup_secret,
+    record_logout,
+    revoke_current_session,
+    revoke_session,
     require_authenticated_if_enabled,
     require_roles_if_enabled,
+    set_user_activation,
+    set_user_well_access,
+    set_user_role,
+    validate_auth_runtime_security,
 )
 from .config import get_settings
 from .database import BackendConfigurationError, get_db
@@ -35,6 +72,8 @@ from .schemas import (
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+_rate_limit_lock = Lock()
+_rate_limit_buckets: dict[str, deque[float]] = defaultdict(deque)
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,15 +86,86 @@ app.add_middleware(
 
 @app.on_event('startup')
 def startup_init_auth() -> None:
-    init_auth_db()
+    validate_auth_runtime_security()
+    if settings.auth_skip_db_init:
+        print('[auth] AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
+        return
+    from .database import _ensure_session_factory
+
+    max_attempts = max(1, settings.auth_db_init_max_retries)
+    for attempt in range(1, max_attempts + 1):
+        session = None
+        try:
+            session = _ensure_session_factory()()
+            init_auth_db(session)
+            if attempt > 1:
+                print(f'[auth] init_auth_db succeeded on attempt {attempt}/{max_attempts}')
+            return
+        except (OperationalError, SQLAlchemyError) as exc:
+            if attempt >= max_attempts:
+                print(f'[auth] init_auth_db failed after {attempt}/{max_attempts} attempts')
+                raise
+            print(
+                f'[auth] init_auth_db failed ({attempt}/{max_attempts}): '
+                f'{exc.__class__.__name__}. Retrying in {settings.auth_db_init_retry_delay_seconds:.1f}s'
+            )
+            sleep(max(0.0, settings.auth_db_init_retry_delay_seconds))
+        finally:
+            if session is not None:
+                session.close()
 
 
 @app.middleware('http')
 async def add_server_timing_header(request: Request, call_next):
+    if settings.enforce_https_in_prod and (settings.app_env or 'dev').lower() == 'prod':
+        forwarded_proto = (request.headers.get('x-forwarded-proto') or '').lower().strip()
+        if forwarded_proto not in {'https'}:
+            return JSONResponse(status_code=400, content={'detail': 'HTTPS is required in production.'})
+
+    content_length = request.headers.get('content-length')
+    if content_length is not None:
+        try:
+            if int(content_length) > settings.max_request_size_bytes:
+                return JSONResponse(status_code=413, content={'detail': 'Payload too large'})
+        except ValueError:
+            return JSONResponse(status_code=400, content={'detail': 'Invalid Content-Length header'})
+
+    def _rate_limited(key: str, limit: int, window_seconds: int) -> bool:
+        now = monotonic()
+        with _rate_limit_lock:
+            bucket = _rate_limit_buckets[key]
+            while bucket and (now - bucket[0]) > float(window_seconds):
+                bucket.popleft()
+            if len(bucket) >= limit:
+                return True
+            bucket.append(now)
+            return False
+
+    client_ip = request.client.host if request.client else 'unknown'
+    username_hint = request.headers.get('x-auth-username', '').strip().lower() or 'anonymous'
+    auth_key = f"auth:{client_ip}:{username_hint}"
+    sensitive_key = f"sensitive:{client_ip}:{username_hint}:{request.url.path}"
+
+    if request.url.path.startswith('/auth/login'):
+        if _rate_limited(auth_key, settings.rate_limit_auth_max_requests, settings.rate_limit_auth_window_seconds):
+            return JSONResponse(status_code=429, content={'detail': 'Too many login requests'})
+    if request.url.path.startswith('/auth/') and not request.url.path.startswith('/auth/login'):
+        if _rate_limited(
+            sensitive_key,
+            settings.rate_limit_sensitive_max_requests,
+            settings.rate_limit_sensitive_window_seconds,
+        ):
+            return JSONResponse(status_code=429, content={'detail': 'Too many sensitive requests'})
+
     started_at = perf_counter()
     response = await call_next(request)
     elapsed_ms = (perf_counter() - started_at) * 1000.0
     response.headers['X-Process-Time-Ms'] = f'{elapsed_ms:.1f}'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     return response
 
 
@@ -288,17 +398,24 @@ def get_debug_sample_tags(
 
 
 @app.post('/auth/login', response_model=UserOut)
-def login(payload: LoginRequest, response: Response) -> UserOut:
-    user = authenticate_user(payload.username, payload.password)
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> UserOut:
+    user = authenticate_user(db, payload)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid credentials')
-    create_session_cookie(response, user)
+    create_session_cookie(db, response, user)
     return UserOut(username=user.username, role=user.role)
 
 
 @app.post('/auth/logout')
-def logout(response: Response) -> dict[str, str]:
+def logout(
+    request: Request,
+    response: Response,
+    user: AuthUser | None = Depends(require_authenticated_if_enabled),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    revoke_current_session(db, request, reason='logout')
     clear_session_cookie(response)
+    record_logout(db, user)
     return {'status': 'ok'}
 
 
@@ -307,3 +424,175 @@ def me(user: AuthUser | None = Depends(require_authenticated_if_enabled)) -> Use
     if user is None:
         return UserOut(username='anonymous', role='operator')
     return UserOut(username=user.username, role=user.role)
+
+
+@app.get('/auth/users', response_model=list[UserAdminOut])
+def auth_users(
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[UserAdminOut]:
+    return list_users(db)
+
+
+@app.post('/auth/users', response_model=UserAdminOut, status_code=status.HTTP_201_CREATED)
+def auth_create_user(
+    payload: UserCreateRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> UserAdminOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return create_user(db, actor, payload)
+
+
+@app.patch('/auth/users/{username}/role', response_model=UserAdminOut)
+def auth_update_role(
+    username: str,
+    payload: UserRoleUpdateRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> UserAdminOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return set_user_role(db, actor, username, payload.role)
+
+
+@app.patch('/auth/users/{username}/activation', response_model=UserAdminOut)
+def auth_update_activation(
+    username: str,
+    payload: UserActivationRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> UserAdminOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return set_user_activation(db, actor, username, payload.is_active)
+
+
+@app.get('/auth/permissions', response_model=list[PermissionOut])
+def auth_permissions(
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[PermissionOut]:
+    return list_permissions(db)
+
+
+@app.get('/auth/roles', response_model=list[RoleOut])
+def auth_roles(
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[RoleOut]:
+    return list_roles(db)
+
+
+@app.get('/auth/users/{username}/well-access', response_model=list[str])
+def auth_get_user_well_access(
+    username: str,
+    _: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> list[str]:
+    return get_user_well_access(db, username)
+
+
+@app.put('/auth/users/{username}/well-access', response_model=list[str])
+def auth_set_user_well_access(
+    username: str,
+    payload: UserWellAccessUpdateRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> list[str]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return set_user_well_access(db, actor, username, payload.wells)
+
+
+@app.post('/auth/change-password')
+def auth_change_password(
+    payload: PasswordChangeRequest,
+    user: AuthUser | None = Depends(require_authenticated_if_enabled),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    change_own_password(db, user, payload)
+    return {'status': 'ok'}
+
+
+@app.post('/auth/users/{username}/reset-password-token', response_model=PasswordResetTokenOut)
+def auth_issue_password_reset(
+    username: str,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> PasswordResetTokenOut:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return issue_password_reset_token(db, actor, username)
+
+
+@app.post('/auth/reset-password/confirm')
+def auth_confirm_password_reset(
+    payload: PasswordResetConfirmRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    consume_password_reset_token(db, payload)
+    return {'status': 'ok'}
+
+
+@app.get('/auth/sessions', response_model=list[SessionOut])
+def auth_list_sessions(
+    username: str | None = None,
+    actor: AuthUser | None = Depends(require_authenticated_if_enabled),
+    db: Session = Depends(get_db),
+) -> list[SessionOut]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    if username and actor.role not in {'admin', 'specialist'} and username.lower() != actor.username.lower():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    return list_active_sessions(db, actor, username)
+
+
+@app.post('/auth/sessions/{session_id}/revoke')
+def auth_revoke_session(
+    session_id: str,
+    payload: SessionRevokeRequest,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    revoke_session(db, actor, session_id, payload.reason)
+    return {'status': 'ok'}
+
+
+@app.post('/auth/mfa/setup', response_model=MfaSetupOut)
+def auth_mfa_setup(
+    user: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> MfaSetupOut:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    return mfa_setup_secret(db, user)
+
+
+@app.post('/auth/mfa/enable')
+def auth_mfa_enable(
+    payload: MfaEnableRequest,
+    user: AuthUser | None = Depends(require_roles_if_enabled('admin', 'specialist')),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required')
+    mfa_enable(db, user, payload.otp_code)
+    return {'status': 'ok'}
+
+
+@app.post('/auth/mfa/disable/{username}')
+def auth_mfa_disable(
+    username: str,
+    actor: AuthUser | None = Depends(require_roles_if_enabled('admin')),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if actor is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Forbidden')
+    mfa_disable(db, actor, username)
+    return {'status': 'ok'}
