@@ -1,11 +1,3 @@
-from pathlib import Path
-import sys
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-BACKEND_ROOT = REPO_ROOT / 'backend_fastapi'
-if str(BACKEND_ROOT) not in sys.path:
-    sys.path.insert(0, str(BACKEND_ROOT))
-
 """Quick benchmark for Phase C KPI latest-samples query paths.
 
 Runs EXPLAIN (ANALYZE, BUFFERS) on:
@@ -17,14 +9,20 @@ Usage:
   python checks/check_v4_kpi_query_paths_benchmark.py --tags spp,rpm,wob
 """
 
+from pathlib import Path
 import argparse
 import re
+import sys
 from typing import Iterable
 
 from sqlalchemy import bindparam, text
 
-from app.database import _ensure_session_factory
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_ROOT = REPO_ROOT / 'backend_fastapi'
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.database import BackendConfigurationError, _ensure_session_factory
 
 TOTAL_TIME_RE = re.compile(r"Execution Time:\s+([0-9.]+)\s+ms", re.IGNORECASE)
 
@@ -43,16 +41,23 @@ def _run_explain(db, sql: str, params: dict) -> tuple[list[str], float | None]:
     return plan_lines, _extract_execution_ms(plan_lines)
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--tags', default='spp,rpm', help='Comma-separated normalized tags')
     args = parser.parse_args()
 
     tags = [item.strip().lower() for item in args.tags.split(',') if item.strip()]
     if not tags:
-        raise SystemExit('No tags provided')
+        print('No tags provided')
+        return 2
 
-    session_factory = _ensure_session_factory()
+    try:
+        session_factory = _ensure_session_factory()
+    except BackendConfigurationError as exc:
+        print('Backend DB configuration is incomplete for benchmark execution.')
+        print(f'detail: {exc}')
+        return 2
+
     with session_factory() as db:
         print('== Phase C KPI query-path benchmark ==')
         print('tags =', tags)
@@ -103,6 +108,8 @@ def main() -> None:
                 print(line)
             print('execution_ms =', elapsed)
 
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

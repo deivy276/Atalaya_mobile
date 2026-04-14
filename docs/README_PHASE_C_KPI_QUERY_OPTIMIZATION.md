@@ -41,6 +41,7 @@ con source `MATVIEW_PARTIAL` o `BASE_TABLE_EXACT_PARTIAL`.
     3. `BASE_TABLE_NORM` (`DISTINCT ON` con normalización)
 - Ejemplo:
   - `python checks/check_v4_kpi_query_paths_benchmark.py --tags spp,rpm,wob`
+- Nota: los scripts de `checks/` ahora fallan de forma controlada con mensaje claro si faltan `DB_*` en el entorno (exit code 2).
 
 ## Avance Fase C
 
