@@ -1,6 +1,5 @@
 from time import perf_counter
 from time import sleep
-import traceback
 import json
 import logging
 from collections import defaultdict, deque
@@ -197,8 +196,7 @@ async def backend_configuration_error_handler(
 
 @app.exception_handler(OperationalError)
 async def operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    print('[fastapi] OperationalError on', request.url.path)
-    traceback.print_exc()
+    logger.exception('[fastapi] OperationalError on %s', request.url.path)
     return JSONResponse(
         status_code=503,
         content={
@@ -214,8 +212,7 @@ async def operational_error_handler(request: Request, exc: OperationalError) -> 
 
 @app.exception_handler(SQLAlchemyError)
 async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
-    print('[fastapi] SQLAlchemyError on', request.url.path)
-    traceback.print_exc()
+    logger.exception('[fastapi] SQLAlchemyError on %s', request.url.path)
     return JSONResponse(
         status_code=500,
         content={
@@ -228,12 +225,11 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JS
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    print('[fastapi] Unhandled exception on', request.url.path)
-    traceback.print_exc()
+    logger.exception('[fastapi] Unhandled exception on %s', request.url.path)
     return JSONResponse(
         status_code=500,
         content={
-            'detail': 'Unexpected server error. The backend printed the traceback in the terminal.',
+            'detail': 'Unexpected server error. Check backend logs for traceback details.',
             'path': request.url.path,
             'error': str(exc)[:240],
             'type': exc.__class__.__name__,
@@ -295,9 +291,9 @@ def get_dashboard(
     started_at = perf_counter()
     payload = repository.fetch_dashboard(fresh=fresh)
     configured_variables = sum(1 for item in payload.variables if item.configured)
-    print(
-        '[dashboard] '
-        + json.dumps(
+    logger.info(
+        '[dashboard] %s',
+        json.dumps(
             {
                 'path': '/api/v1/dashboard',
                 'elapsed_ms': round((perf_counter() - started_at) * 1000.0, 1),
@@ -307,7 +303,7 @@ def get_dashboard(
                 'kp_cache_status': repository.last_kp_cache_status,
                 'samples_source': repository.last_samples_source,
             }
-        )
+        ),
     )
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
@@ -328,9 +324,9 @@ def get_dashboard_full(
     started_at = perf_counter()
     payload = repository.fetch_dashboard_full(fresh=fresh, alerts_fresh=alerts_fresh)
     configured_variables = sum(1 for item in payload.variables if item.configured)
-    print(
-        '[dashboard] '
-        + json.dumps(
+    logger.info(
+        '[dashboard] %s',
+        json.dumps(
             {
                 'path': '/api/v1/dashboard/full',
                 'elapsed_ms': round((perf_counter() - started_at) * 1000.0, 1),
@@ -341,7 +337,7 @@ def get_dashboard_full(
                 'samples_source': repository.last_samples_source,
                 'alerts_cache_status': repository.last_alerts_cache_status,
             }
-        )
+        ),
     )
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
