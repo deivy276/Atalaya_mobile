@@ -97,7 +97,7 @@ def startup_init_auth() -> None:
             settings.db_connection_budget,
         )
     if settings.auth_skip_db_init:
-        print('[auth] AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
+        logger.info('AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
         return
     from .database import _ensure_session_factory
 
@@ -108,15 +108,18 @@ def startup_init_auth() -> None:
             session = _ensure_session_factory()()
             init_auth_db(session)
             if attempt > 1:
-                print(f'[auth] init_auth_db succeeded on attempt {attempt}/{max_attempts}')
+                logger.info('init_auth_db succeeded on attempt %s/%s', attempt, max_attempts)
             return
         except (OperationalError, SQLAlchemyError) as exc:
             if attempt >= max_attempts:
-                print(f'[auth] init_auth_db failed after {attempt}/{max_attempts} attempts')
+                logger.error('init_auth_db failed after %s/%s attempts', attempt, max_attempts)
                 raise
-            print(
-                f'[auth] init_auth_db failed ({attempt}/{max_attempts}): '
-                f'{exc.__class__.__name__}. Retrying in {settings.auth_db_init_retry_delay_seconds:.1f}s'
+            logger.warning(
+                'init_auth_db failed (%s/%s): %s. Retrying in %.1fs',
+                attempt,
+                max_attempts,
+                exc.__class__.__name__,
+                settings.auth_db_init_retry_delay_seconds,
             )
             sleep(max(0.0, settings.auth_db_init_retry_delay_seconds))
         finally:
