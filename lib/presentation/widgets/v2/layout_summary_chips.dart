@@ -60,12 +60,13 @@ class LayoutSummaryChips extends StatelessWidget {
               onTap: onTapLayout,
               semanticLabel: 'Cambiar vista actual: $layoutLabel',
             ),
-            _ChipLabel(
-              text: compact ? 'Reset' : 'Restablecer',
-              icon: Icons.restart_alt_rounded,
-              onTap: onTapReset,
-              semanticLabel: 'Restablecer ajustes de layout',
-            ),
+        _ChipLabel(
+          text: compact ? 'Reset' : 'Restablecer',
+          icon: Icons.restart_alt_rounded,
+          onTap: onTapReset,
+          semanticLabel: 'Restablecer ajustes de layout',
+          showDisabledHint: true,
+        ),
           ],
         );
       },
@@ -80,6 +81,7 @@ class _ChipLabel extends StatelessWidget {
     this.onTap,
     this.semanticLabel,
     this.textColor,
+    this.showDisabledHint = false,
   });
 
   final String text;
@@ -87,14 +89,16 @@ class _ChipLabel extends StatelessWidget {
   final VoidCallback? onTap;
   final String? semanticLabel;
   final Color? textColor;
+  final bool showDisabledHint;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: onTap != null,
+      enabled: onTap != null,
       label: semanticLabel ?? text,
       child: Tooltip(
-        message: onTap == null ? '$text (sin cambios pendientes)' : text,
+        message: onTap == null && showDisabledHint ? '$text (sin cambios pendientes)' : text,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
