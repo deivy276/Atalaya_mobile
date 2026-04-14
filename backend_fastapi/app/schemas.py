@@ -71,6 +71,18 @@ class DashboardOut(BaseModel):
     alerts: list[AlertOut]
 
 
+class DashboardDiagnosticsOut(BaseModel):
+    cacheStatus: str
+    kpCacheStatus: str
+    samplesSource: str
+    samplesMissingTags: int
+    samplesMissingRatio: float
+    samplesResolutionMs: float
+    samplesFallbackUsed: bool
+    samplesFallbackBlocked: bool
+    configuredVariables: int
+
+
 class TrendPointOut(BaseModel):
     timestamp: datetime
     value: float

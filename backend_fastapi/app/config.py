@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     alerts_cache_ttl_seconds: int = Field(default=2, alias='ALERTS_CACHE_TTL_SECONDS')
     kp_state_cache_ttl_seconds: int = Field(default=10, alias='KP_STATE_CACHE_TTL_SECONDS')
     sample_tag_existence_cache_ttl_seconds: int = Field(default=120, alias='SAMPLE_TAG_EXISTENCE_CACHE_TTL_SECONDS')
+    latest_samples_fallback_max_missing_tags: int = Field(default=2, alias='LATEST_SAMPLES_FALLBACK_MAX_MISSING_TAGS')
+    latest_samples_fallback_max_missing_ratio: float = Field(default=0.35, alias='LATEST_SAMPLES_FALLBACK_MAX_MISSING_RATIO')
 
 
     auth_enabled: bool = Field(default=False, alias='AUTH_ENABLED')
@@ -146,6 +148,11 @@ class Settings(BaseSettings):
             f'{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}'
             f'?sslmode={self.db_sslmode}&connect_timeout={self.db_connect_timeout_seconds}'
         )
+
+    @property
+    def estimated_db_connection_peak(self) -> int:
+        workers = max(1, int(self.app_workers))
+        return workers * (max(1, int(self.pool_size)) + max(0, int(self.max_overflow)))
 
 
 @lru_cache(maxsize=1)
