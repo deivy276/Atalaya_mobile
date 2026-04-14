@@ -624,9 +624,13 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                           color: currentStatusColor,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          'Estado: $currentStatus · Variables: $currentTileCount',
-                          style: const TextStyle(color: LayoutTokens.textMuted),
+                        Flexible(
+                          child: Text(
+                            'Estado: $currentStatus · Variables: $currentTileCount',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: LayoutTokens.textMuted),
+                          ),
                         ),
                       ],
                     ),
