@@ -386,6 +386,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
     if (confirmed == true) {
       await _resetLayoutPreferences();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Layout restablecido a valores predeterminados'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
       if (closeControlsSheet && context.mounted) {
         Navigator.of(context).pop();
       }
