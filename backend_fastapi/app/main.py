@@ -1,6 +1,9 @@
 from time import perf_counter
 import traceback
 import json
+from collections import defaultdict, deque
+from threading import Lock
+from time import monotonic
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,6 +71,8 @@ from .schemas import (
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+_rate_limit_lock = Lock()
+_rate_limit_buckets: dict[str, deque[float]] = defaultdict(deque)
 
 app.add_middleware(
     CORSMiddleware,
@@ -92,10 +97,55 @@ def startup_init_auth() -> None:
 
 @app.middleware('http')
 async def add_server_timing_header(request: Request, call_next):
+    if settings.enforce_https_in_prod and (settings.app_env or 'dev').lower() == 'prod':
+        forwarded_proto = (request.headers.get('x-forwarded-proto') or '').lower().strip()
+        if forwarded_proto not in {'https'}:
+            return JSONResponse(status_code=400, content={'detail': 'HTTPS is required in production.'})
+
+    content_length = request.headers.get('content-length')
+    if content_length is not None:
+        try:
+            if int(content_length) > settings.max_request_size_bytes:
+                return JSONResponse(status_code=413, content={'detail': 'Payload too large'})
+        except ValueError:
+            return JSONResponse(status_code=400, content={'detail': 'Invalid Content-Length header'})
+
+    def _rate_limited(key: str, limit: int, window_seconds: int) -> bool:
+        now = monotonic()
+        with _rate_limit_lock:
+            bucket = _rate_limit_buckets[key]
+            while bucket and (now - bucket[0]) > float(window_seconds):
+                bucket.popleft()
+            if len(bucket) >= limit:
+                return True
+            bucket.append(now)
+            return False
+
+    client_ip = request.client.host if request.client else 'unknown'
+    username_hint = request.headers.get('x-auth-username', '').strip().lower() or 'anonymous'
+    auth_key = f"auth:{client_ip}:{username_hint}"
+    sensitive_key = f"sensitive:{client_ip}:{username_hint}:{request.url.path}"
+
+    if request.url.path.startswith('/auth/login'):
+        if _rate_limited(auth_key, settings.rate_limit_auth_max_requests, settings.rate_limit_auth_window_seconds):
+            return JSONResponse(status_code=429, content={'detail': 'Too many login requests'})
+    if request.url.path.startswith('/auth/') and not request.url.path.startswith('/auth/login'):
+        if _rate_limited(
+            sensitive_key,
+            settings.rate_limit_sensitive_max_requests,
+            settings.rate_limit_sensitive_window_seconds,
+        ):
+            return JSONResponse(status_code=429, content={'detail': 'Too many sensitive requests'})
+
     started_at = perf_counter()
     response = await call_next(request)
     elapsed_ms = (perf_counter() - started_at) * 1000.0
     response.headers['X-Process-Time-Ms'] = f'{elapsed_ms:.1f}'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     return response
 
 

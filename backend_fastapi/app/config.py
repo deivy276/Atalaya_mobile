@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     app_name: str = 'Atalaya FastAPI'
     api_prefix: str = '/api/v1'
     cors_origins_raw: str = Field(default='*', alias='CORS_ORIGINS')
+    max_request_size_bytes: int = Field(default=1048576, alias='MAX_REQUEST_SIZE_BYTES')
+    enforce_https_in_prod: bool = Field(default=True, alias='ENFORCE_HTTPS_IN_PROD')
+    rate_limit_auth_max_requests: int = Field(default=10, alias='RATE_LIMIT_AUTH_MAX_REQUESTS')
+    rate_limit_auth_window_seconds: int = Field(default=60, alias='RATE_LIMIT_AUTH_WINDOW_SECONDS')
+    rate_limit_sensitive_max_requests: int = Field(default=120, alias='RATE_LIMIT_SENSITIVE_MAX_REQUESTS')
+    rate_limit_sensitive_window_seconds: int = Field(default=60, alias='RATE_LIMIT_SENSITIVE_WINDOW_SECONDS')
 
     db_host: str = Field(default='', alias='DB_HOST')
     db_port: int = Field(default=5432, alias='DB_PORT')

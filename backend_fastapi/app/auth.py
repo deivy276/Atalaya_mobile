@@ -131,6 +131,8 @@ def validate_auth_runtime_security() -> None:
         raise RuntimeError('AUTH_COOKIE_SAMESITE must be Lax or Strict in prod.')
     if not settings.auth_effective_secret_key or settings.auth_effective_secret_key.startswith('change-me'):
         raise RuntimeError('AUTH_SECRET_KEY for current environment is not configured safely.')
+    if env == 'prod' and '*' in settings.cors_origins:
+        raise RuntimeError('CORS_ORIGINS cannot be * in prod.')
 
 
 def _password_has_required_complexity(password: str) -> bool:
@@ -264,6 +266,28 @@ def _seed_rbac(db: Session) -> None:
                 {'role_name': role_name, 'permission_code': permission},
             )
 
+    _seed_rbac(db)
+    _seed_bootstrap_admin(db)
+    db.commit()
+
+
+def _seed_rbac(db: Session) -> None:
+    for permission in ('dashboard:read', 'alerts:read', 'control_panel:write', 'users:manage', 'sessions:revoke', 'mfa:manage'):
+        db.execute(text('INSERT INTO permissions(code) VALUES (:code) ON CONFLICT(code) DO NOTHING'), {'code': permission})
+
+    roles = {
+        'admin': ['dashboard:read', 'alerts:read', 'control_panel:write', 'users:manage', 'sessions:revoke', 'mfa:manage'],
+        'specialist': ['dashboard:read', 'alerts:read', 'control_panel:write', 'mfa:manage'],
+        'operator': ['dashboard:read', 'alerts:read'],
+        'viewer': ['dashboard:read', 'alerts:read'],
+    }
+    for role_name, permissions in roles.items():
+        db.execute(text('INSERT INTO roles(name) VALUES (:name) ON CONFLICT(name) DO NOTHING'), {'name': role_name})
+        for permission in permissions:
+            db.execute(
+                text('INSERT INTO role_permissions(role_id, permission_id) SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = :role_name AND p.code = :permission_code ON CONFLICT(role_id, permission_id) DO NOTHING'),
+                {'role_name': role_name, 'permission_code': permission},
+            )
 
 def _seed_bootstrap_admin(db: Session) -> None:
     settings = get_settings()

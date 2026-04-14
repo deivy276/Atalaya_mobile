@@ -68,6 +68,11 @@ Se agregó una capa de autenticación basada en cookie de sesión para proteger 
 - La autenticación ya no depende de SQLite local: usa tablas en PostgreSQL (`users`, `roles`, `permissions`, `role_permissions`, `user_well_access`).
 - Se guarda session store en DB (`auth_sessions`) para revocación remota por riesgo (robo/pérdida).
 - Reset de contraseña usa token temporal (`password_reset_tokens`) con expiración corta y revoca sesiones activas al confirmar.
+- API hardening fase 4:
+  - Rate limit en login y endpoints sensibles.
+  - Límite de payload por `Content-Length`.
+  - Headers de seguridad (`HSTS`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`).
+  - En `prod`: rechazo de HTTP sin TLS cuando `ENFORCE_HTTPS_IN_PROD=true`.
 
 Bootstrap local de usuario admin:
 
@@ -78,6 +83,7 @@ Bootstrap local de usuario admin:
 > - Configura secreto por ambiente (`APP_ENV` + `AUTH_SECRET_KEY_DEV|STAGE|PROD`).
 > - Forzar cookie segura con `AUTH_COOKIE_SECURE=true`.
 > - Definir `AUTH_COOKIE_SAMESITE=lax` o `strict`.
+> - Cerrar CORS por ambiente (`CORS_ORIGINS` sin `*` en prod).
 > - Nunca commitear `.env` real; usar gestor de secretos/vault.
 
 ## Base de datos esperada
