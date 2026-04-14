@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from time import sleep
+from typing import Any
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
@@ -29,6 +30,9 @@ def _is_transient_operational_error(exc: Exception) -> bool:
         'temporary failure',
         'name or service not known',
         'failed to resolve host',
+        'could not translate host name',
+        'network is unreachable',
+        'connection timed out',
     )
     return any(marker in message for marker in transient_markers)
 
@@ -42,11 +46,19 @@ def _timeout_options_sql() -> str:
 
 def _merge_connect_options(existing: str | None) -> str:
     base = (existing or '').strip()
-    extra = _timeout_options_sql().strip()
-    return f'{base} {extra}'.strip() if base else extra
+    parts: list[str] = []
+    if base:
+        parts.append(base)
+    if 'statement_timeout=' not in base:
+        parts.append(f"-c statement_timeout={max(0, int(settings.statement_timeout_ms))}")
+    if 'idle_in_transaction_session_timeout=' not in base:
+        parts.append(
+            f"-c idle_in_transaction_session_timeout={max(0, int(settings.idle_in_transaction_session_timeout_ms))}"
+        )
+    return ' '.join(part for part in parts if part).strip()
 
 
-def _connect_with_retry(dialect, cargs, cparams):
+def _connect_with_retry(dialect: Any, cargs: tuple[Any, ...], cparams: dict[str, Any]):
     attempts = max(1, int(settings.db_retry_attempts))
     backoff_seconds = max(0, int(settings.db_retry_backoff_ms)) / 1000.0
     connect_kwargs = dict(cparams)
@@ -83,13 +95,12 @@ def _ensure_session_factory():
         pool_timeout=max(1, int(settings.pool_timeout_seconds)),
         connect_args={
             'connect_timeout': max(1, int(settings.db_connect_timeout_seconds)),
-            'options': _timeout_options_sql(),
         },
         future=True,
     )
 
     @event.listens_for(_engine, 'do_connect')
-    def _on_do_connect(dialect, conn_rec, cargs, cparams):
+    def _on_do_connect(dialect: Any, _conn_rec: Any, cargs: tuple[Any, ...], cparams: dict[str, Any]):
         return _connect_with_retry(dialect, cargs, cparams)
 
     _session_factory = sessionmaker(

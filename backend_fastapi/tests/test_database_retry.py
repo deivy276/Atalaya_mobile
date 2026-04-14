@@ -58,6 +58,17 @@ class DatabaseRetryTests(unittest.TestCase):
         merged = database._merge_connect_options('-c application_name=atalaya')
         self.assertIn('application_name=atalaya', merged)
         self.assertIn('statement_timeout=', merged)
+        self.assertIn('idle_in_transaction_session_timeout=', merged)
+
+    def test_merge_connect_options_is_idempotent_for_timeout_flags(self) -> None:
+        existing = (
+            '-c statement_timeout=7777 '
+            '-c idle_in_transaction_session_timeout=22222 '
+            '-c application_name=atalaya'
+        )
+        merged = database._merge_connect_options(existing)
+        self.assertEqual(merged.count('statement_timeout='), 1)
+        self.assertEqual(merged.count('idle_in_transaction_session_timeout='), 1)
 
     def test_connect_with_retry_does_not_swallow_non_operational_exception(self) -> None:
         dialect = _FakeDialect()
