@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     db_user: str = Field(default='', alias='DB_USER')
     db_password: str = Field(default='', alias='DB_PASSWORD')
     db_sslmode: str = Field(default='require', alias='DB_SSLMODE')
+    db_connect_timeout_seconds: int = Field(default=10, alias='DB_CONNECT_TIMEOUT_SECONDS')
+    db_pool_size: int = Field(default=5, alias='DB_POOL_SIZE')
+    db_max_overflow: int = Field(default=10, alias='DB_MAX_OVERFLOW')
+    db_pool_timeout_seconds: int = Field(default=30, alias='DB_POOL_TIMEOUT_SECONDS')
+    db_pool_recycle_seconds: int = Field(default=300, alias='DB_POOL_RECYCLE_SECONDS')
 
     dashboard_alert_limit: int = Field(default=25, alias='DASHBOARD_ALERT_LIMIT')
     stale_threshold_seconds: int = Field(default=10, alias='STALE_THRESHOLD_SECONDS')
@@ -66,6 +71,8 @@ class Settings(BaseSettings):
     )
     bootstrap_admin_username: str = Field(default='admin', alias='BOOTSTRAP_ADMIN_USERNAME')
     bootstrap_admin_password: str = Field(default='', alias='BOOTSTRAP_ADMIN_PASSWORD')
+    auth_db_init_max_retries: int = Field(default=3, alias='AUTH_DB_INIT_MAX_RETRIES')
+    auth_db_init_retry_delay_seconds: float = Field(default=1.5, alias='AUTH_DB_INIT_RETRY_DELAY_SECONDS')
 
     latest_samples_summary_name: str = Field(
         default='public.atalaya_latest_samples_mv',
@@ -137,7 +144,7 @@ class Settings(BaseSettings):
         return (
             'postgresql+psycopg://'
             f'{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}'
-            f'?sslmode={self.db_sslmode}'
+            f'?sslmode={self.db_sslmode}&connect_timeout={self.db_connect_timeout_seconds}'
         )
 
 

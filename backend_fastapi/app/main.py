@@ -1,4 +1,5 @@
 from time import perf_counter
+from time import sleep
 import traceback
 import json
 from collections import defaultdict, deque
@@ -91,11 +92,27 @@ def startup_init_auth() -> None:
         return
     from .database import _ensure_session_factory
 
-    session = _ensure_session_factory()()
-    try:
-        init_auth_db(session)
-    finally:
-        session.close()
+    max_attempts = max(1, settings.auth_db_init_max_retries)
+    for attempt in range(1, max_attempts + 1):
+        session = None
+        try:
+            session = _ensure_session_factory()()
+            init_auth_db(session)
+            if attempt > 1:
+                print(f'[auth] init_auth_db succeeded on attempt {attempt}/{max_attempts}')
+            return
+        except (OperationalError, SQLAlchemyError) as exc:
+            if attempt >= max_attempts:
+                print(f'[auth] init_auth_db failed after {attempt}/{max_attempts} attempts')
+                raise
+            print(
+                f'[auth] init_auth_db failed ({attempt}/{max_attempts}): '
+                f'{exc.__class__.__name__}. Retrying in {settings.auth_db_init_retry_delay_seconds:.1f}s'
+            )
+            sleep(max(0.0, settings.auth_db_init_retry_delay_seconds))
+        finally:
+            if session is not None:
+                session.close()
 
 
 @app.middleware('http')
