@@ -671,6 +671,17 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                         label: const Text('Restablecer layout'),
                       ),
                     ),
+                    if (_isDefaultLayoutConfig)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Ya estás usando la configuración por defecto.',
+                          style: TextStyle(
+                            color: LayoutTokens.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
