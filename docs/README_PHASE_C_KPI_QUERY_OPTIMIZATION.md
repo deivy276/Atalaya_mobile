@@ -30,6 +30,10 @@ Headers de observabilidad en `/api/v1/dashboard` y `/api/v1/dashboard/full`:
 - `X-Samples-Resolution-Ms`
 - `X-Samples-Fallback-Used`
 
+Cuando `X-Samples-Source=CACHE`, los campos de missing/fallback se reinician a
+valores neutros (`0`, `0.000`, `0.0`, `false`) para evitar arrastre de métricas
+de requests anteriores.
+
 ## Scripts SQL
 
 - Índices base: `sql/atalaya_v3_indexes.sql`

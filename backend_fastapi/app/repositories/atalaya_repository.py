@@ -137,6 +137,10 @@ class AtalayaDataRepository:
                     self.last_dashboard_cache_status = 'HIT'
                     self.last_kp_cache_status = 'SKIP'
                     self.last_samples_source = 'CACHE'
+                    self.last_samples_missing_tags = 0
+                    self.last_samples_missing_ratio = 0.0
+                    self.last_samples_resolution_ms = 0.0
+                    self.last_samples_fallback_used = False
                     return copy.deepcopy(cached)
 
         self.last_dashboard_cache_status = 'MISS'

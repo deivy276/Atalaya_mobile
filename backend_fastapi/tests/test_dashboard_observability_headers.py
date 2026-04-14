@@ -66,14 +66,17 @@ class DashboardObservabilityHeaderTests(unittest.TestCase):
     def setUp(self) -> None:
         self._original_auth_skip_db_init = settings.auth_skip_db_init
         self._original_auth_enabled = settings.auth_enabled
+        self._original_auth_secret_key = settings.auth_secret_key
         settings.auth_skip_db_init = True
         settings.auth_enabled = False
+        settings.auth_secret_key = 'DevStrongSecret#12345'
         app.dependency_overrides[get_db] = _fake_db
         app.dependency_overrides[get_repository] = lambda: _FakeRepository()
 
     def tearDown(self) -> None:
         settings.auth_skip_db_init = self._original_auth_skip_db_init
         settings.auth_enabled = self._original_auth_enabled
+        settings.auth_secret_key = self._original_auth_secret_key
         app.dependency_overrides.clear()
 
     def test_dashboard_includes_samples_observability_headers(self) -> None:
