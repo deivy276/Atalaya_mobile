@@ -35,10 +35,7 @@ class Settings(BaseSettings):
     db_user: str = Field(default='', alias='DB_USER')
     db_password: str = Field(default='', alias='DB_PASSWORD')
     db_sslmode: str = Field(default='require', alias='DB_SSLMODE')
-    db_connect_timeout_seconds: int = Field(
-        default=10,
-        validation_alias=AliasChoices('DB_CONNECT_TIMEOUT_SECONDS', 'CONNECT_TIMEOUT_SECONDS'),
-    )
+    db_connect_timeout_seconds: int = Field(default=10, alias='DB_CONNECT_TIMEOUT_SECONDS')
     pool_size: int = Field(
         default=5,
         validation_alias=AliasChoices('POOL_SIZE', 'DB_POOL_SIZE'),

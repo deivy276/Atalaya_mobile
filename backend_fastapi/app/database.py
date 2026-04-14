@@ -1,9 +1,7 @@
 from collections.abc import Generator
 from time import sleep
 
-import psycopg
-from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import get_settings
@@ -35,26 +33,29 @@ def _is_transient_operational_error(exc: Exception) -> bool:
     return any(marker in message for marker in transient_markers)
 
 
-def _connect_with_retry():
-    attempts = max(1, int(settings.db_retry_attempts))
-    backoff_seconds = max(0, int(settings.db_retry_backoff_ms)) / 1000.0
-    options = (
+def _timeout_options_sql() -> str:
+    return (
         f"-c statement_timeout={max(0, int(settings.statement_timeout_ms))} "
         f"-c idle_in_transaction_session_timeout={max(0, int(settings.idle_in_transaction_session_timeout_ms))}"
     )
+
+
+def _merge_connect_options(existing: str | None) -> str:
+    base = (existing or '').strip()
+    extra = _timeout_options_sql().strip()
+    return f'{base} {extra}'.strip() if base else extra
+
+
+def _connect_with_retry(dialect, cargs, cparams):
+    attempts = max(1, int(settings.db_retry_attempts))
+    backoff_seconds = max(0, int(settings.db_retry_backoff_ms)) / 1000.0
+    connect_kwargs = dict(cparams)
+    connect_kwargs.setdefault('connect_timeout', max(1, int(settings.db_connect_timeout_seconds)))
+    connect_kwargs['options'] = _merge_connect_options(connect_kwargs.get('options'))
     for attempt in range(attempts):
         try:
-            return psycopg.connect(
-                host=settings.db_host,
-                port=settings.db_port,
-                dbname=settings.db_name,
-                user=settings.db_user,
-                password=settings.db_password,
-                sslmode=settings.db_sslmode,
-                connect_timeout=max(1, int(settings.db_connect_timeout_seconds)),
-                options=options,
-            )
-        except psycopg.OperationalError as exc:
+            return dialect.dbapi.connect(*cargs, **connect_kwargs)
+        except Exception as exc:
             if not _is_transient_operational_error(exc) or attempt == attempts - 1:
                 raise
             sleep(backoff_seconds * (2**attempt))
@@ -77,9 +78,17 @@ def _ensure_session_factory():
         pool_size=max(1, int(settings.pool_size)),
         max_overflow=max(0, int(settings.max_overflow)),
         pool_timeout=max(1, int(settings.pool_timeout_seconds)),
-        creator=_connect_with_retry,
+        connect_args={
+            'connect_timeout': max(1, int(settings.db_connect_timeout_seconds)),
+            'options': _timeout_options_sql(),
+        },
         future=True,
     )
+
+    @event.listens_for(_engine, 'do_connect')
+    def _on_do_connect(dialect, conn_rec, cargs, cparams):
+        return _connect_with_retry(dialect, cargs, cparams)
+
     _session_factory = sessionmaker(
         bind=_engine,
         autoflush=False,
