@@ -956,14 +956,15 @@ class AtalayaDataRepository:
             return cls._latest_samples_summary_meta_cache
 
         schema, table = self._split_qualified_name(settings.latest_samples_summary_name)
-        if not self._matview_exists(schema, table):
+        if not self._matview_exists(schema, table) and not self._table_exists(schema, table):
             cls._latest_samples_summary_detection_done = True
             cls._latest_samples_summary_meta_cache = None
             return None
 
         # PostgreSQL materialized views are visible in pg_matviews, but in some
         # environments they do not surface through information_schema.columns.
-        # Use pg_catalog for column discovery so we can reliably detect the MV.
+        # Use pg_catalog for column discovery so we can reliably detect the MV
+        # and also support plain tables used as latest-by-tag stores.
         columns = self._get_relation_columns(schema, table)
         required = {'tag_norm', 'actual_tag', 'value', 'created_at'}
         if not required.issubset(set(columns)):
