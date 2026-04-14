@@ -511,81 +511,83 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Text(
-                    'Opciones de layout',
-                    style: TextStyle(
-                      color: LayoutTokens.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      'Opciones de layout',
+                      style: TextStyle(
+                        color: LayoutTokens.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Densidad',
-                    style: TextStyle(color: LayoutTokens.textSecondary),
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<_DensityMode>(
-                    style: ButtonStyle(
-                      foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-                      backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Densidad',
+                      style: TextStyle(color: LayoutTokens.textSecondary),
                     ),
-                    showSelectedIcon: false,
-                    segments: const <ButtonSegment<_DensityMode>>[
-                      ButtonSegment<_DensityMode>(
-                        value: _DensityMode.compact,
-                        label: Text('Compacto'),
+                    const SizedBox(height: 8),
+                    SegmentedButton<_DensityMode>(
+                      style: ButtonStyle(
+                        foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+                        backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
                       ),
-                      ButtonSegment<_DensityMode>(
-                        value: _DensityMode.comfortable,
-                        label: Text('Cómodo'),
-                      ),
-                    ],
-                    selected: <_DensityMode>{_densityMode},
-                    onSelectionChanged: (selection) {
-                      if (selection.isNotEmpty) {
-                        _setDensityMode(selection.first);
-                        setSheetState(() {});
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Vista de tiles',
-                    style: TextStyle(color: LayoutTokens.textSecondary),
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<_TileLayoutMode>(
-                    style: ButtonStyle(
-                      foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-                      backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
+                      showSelectedIcon: false,
+                      segments: const <ButtonSegment<_DensityMode>>[
+                        ButtonSegment<_DensityMode>(
+                          value: _DensityMode.compact,
+                          label: Text('Compacto'),
+                        ),
+                        ButtonSegment<_DensityMode>(
+                          value: _DensityMode.comfortable,
+                          label: Text('Cómodo'),
+                        ),
+                      ],
+                      selected: <_DensityMode>{_densityMode},
+                      onSelectionChanged: (selection) {
+                        if (selection.isNotEmpty) {
+                          _setDensityMode(selection.first);
+                          setSheetState(() {});
+                        }
+                      },
                     ),
-                    showSelectedIcon: false,
-                    segments: const <ButtonSegment<_TileLayoutMode>>[
-                      ButtonSegment<_TileLayoutMode>(
-                        value: _TileLayoutMode.grid,
-                        icon: Icon(Icons.grid_view_rounded, size: 18),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Vista de tiles',
+                      style: TextStyle(color: LayoutTokens.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<_TileLayoutMode>(
+                      style: ButtonStyle(
+                        foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+                        backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
                       ),
-                      ButtonSegment<_TileLayoutMode>(
-                        value: _TileLayoutMode.list,
-                        icon: Icon(Icons.view_agenda_rounded, size: 18),
-                      ),
-                    ],
-                    selected: <_TileLayoutMode>{_tileLayoutMode},
-                    onSelectionChanged: (selection) {
-                      if (selection.isNotEmpty) {
-                        _setTileLayoutMode(selection.first);
-                        setSheetState(() {});
-                      }
-                    },
-                  ),
-                ],
+                      showSelectedIcon: false,
+                      segments: const <ButtonSegment<_TileLayoutMode>>[
+                        ButtonSegment<_TileLayoutMode>(
+                          value: _TileLayoutMode.grid,
+                          icon: Icon(Icons.grid_view_rounded, size: 18),
+                        ),
+                        ButtonSegment<_TileLayoutMode>(
+                          value: _TileLayoutMode.list,
+                          icon: Icon(Icons.view_agenda_rounded, size: 18),
+                        ),
+                      ],
+                      selected: <_TileLayoutMode>{_tileLayoutMode},
+                      onSelectionChanged: (selection) {
+                        if (selection.isNotEmpty) {
+                          _setTileLayoutMode(selection.first);
+                          setSheetState(() {});
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
             );
           },
