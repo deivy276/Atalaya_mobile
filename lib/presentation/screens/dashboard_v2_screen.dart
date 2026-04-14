@@ -351,6 +351,16 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     await prefs.setString(_layoutPrefKey, mode.name);
   }
 
+  Future<void> _resetLayoutPreferences() async {
+    setState(() {
+      _densityMode = _DensityMode.comfortable;
+      _tileLayoutMode = _TileLayoutMode.grid;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_densityPrefKey);
+    await prefs.remove(_layoutPrefKey);
+  }
+
   DashboardUiModel _buildUiModel(
     DashboardViewState state,
     Map<String, String> unitPreferences,
@@ -591,6 +601,20 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                           setSheetState(() {});
                         }
                       },
+                    ),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          await _resetLayoutPreferences();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        icon: const Icon(Icons.restart_alt_rounded),
+                        label: const Text('Restablecer layout'),
+                      ),
                     ),
                   ],
                 ),
