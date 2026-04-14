@@ -107,7 +107,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
           left: 0,
           right: 0,
           bottom: 0,
-          child: PredictorAlertsDock(alerts: viewState.payload.alerts),
+          child: PredictorAlertsDock(
+            alerts: viewState.payload.alerts,
+            onOpenAlert: _openAlertDetail,
+          ),
         ),
       ],
     );
@@ -121,40 +124,49 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     String job,
     Map<String, String> unitPrefs,
   ) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: CustomScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
-            slivers: <Widget>[
-              SliverToBoxAdapter(
-                child: _DashboardHeading(
-                  title: uiModel.appTitle,
-                  status: uiModel.wellStatus,
-                  selectedVariableId: uiModel.selectedVariableId,
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1480),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: CustomScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
+                slivers: <Widget>[
+                  SliverToBoxAdapter(
+                    child: _DashboardHeading(
+                      title: uiModel.appTitle,
+                      status: uiModel.wellStatus,
+                      selectedVariableId: uiModel.selectedVariableId,
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  SliverToBoxAdapter(
+                    child: WellOverviewCard(
+                      well: uiModel.activeWell,
+                      job: job,
+                      isActive: viewState.connectionStatus == ConnectionStatus.connected,
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  _buildTilesGrid(viewState, uiModel, well, job, unitPrefs),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 360,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 14, 20, 20),
+                child: PredictorAlertsDock(
+                  alerts: viewState.payload.alerts,
+                  embedded: true,
+                  onOpenAlert: _openAlertDetail,
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
-              SliverToBoxAdapter(
-                child: WellOverviewCard(
-                  well: uiModel.activeWell,
-                  job: job,
-                  isActive: viewState.connectionStatus == ConnectionStatus.connected,
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              _buildTilesGrid(viewState, uiModel, well, job, unitPrefs),
-            ],
-          ),
+            ),
+          ],
         ),
-        SizedBox(
-          width: 360,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 14, 20, 20),
-            child: PredictorAlertsDock(alerts: viewState.payload.alerts, embedded: true),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -283,6 +295,80 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       }
     }
     return TileVisualStatus.normal;
+  }
+
+
+  Future<void> _openAlertDetail(AtalayaAlert alert) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0A162A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final severityColor = switch (alert.severity) {
+          AlertSeverity.critical => LayoutTokens.accentRed,
+          AlertSeverity.attention => LayoutTokens.accentOrange,
+          AlertSeverity.ok => LayoutTokens.accentBlue,
+        };
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: LayoutTokens.textMuted,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: severityColor.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: severityColor),
+                    ),
+                    child: Text(
+                      alert.severity.compactLabel,
+                      style: TextStyle(color: severityColor, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    DateFormat('dd/MM HH:mm').format(alert.createdAt.toLocal()),
+                    style: const TextStyle(color: LayoutTokens.textSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                alert.description,
+                style: const TextStyle(
+                  color: LayoutTokens.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Adjuntos: ${alert.attachmentsCount}',
+                style: const TextStyle(color: LayoutTokens.textMuted),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openVariableDetail(

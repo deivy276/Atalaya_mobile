@@ -9,10 +9,12 @@ class PredictorAlertsDock extends StatefulWidget {
     super.key,
     required this.alerts,
     this.embedded = false,
+    this.onOpenAlert,
   });
 
   final List<AtalayaAlert> alerts;
   final bool embedded;
+  final ValueChanged<AtalayaAlert>? onOpenAlert;
 
   @override
   State<PredictorAlertsDock> createState() => _PredictorAlertsDockState();
@@ -109,7 +111,10 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  FilledButton(onPressed: () {}, child: const Text('VER')),
+                  FilledButton(
+                    onPressed: () => widget.onOpenAlert?.call(alert),
+                    child: const Text('VER'),
+                  ),
                 ],
               ),
             ),
