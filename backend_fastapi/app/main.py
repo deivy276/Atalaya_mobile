@@ -312,6 +312,8 @@ def get_dashboard(
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
     response.headers['X-Samples-Source'] = repository.last_samples_source
+    response.headers['X-Samples-Missing-Tags'] = str(repository.last_samples_missing_tags)
+    response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
     return payload
 
 
@@ -344,6 +346,8 @@ def get_dashboard_full(
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
     response.headers['X-Samples-Source'] = repository.last_samples_source
+    response.headers['X-Samples-Missing-Tags'] = str(repository.last_samples_missing_tags)
+    response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
     response.headers['X-Alerts-Cache-Status'] = repository.last_alerts_cache_status
     response.headers['X-Alerts-Source'] = repository.last_alerts_source
     response.headers['X-Alerts-Text-Repairs'] = str(repository.last_alerts_text_repairs)

@@ -122,6 +122,8 @@ class AtalayaDataRepository:
         self.last_alerts_text_repairs = 0
         self.last_kp_cache_status = 'MISS'
         self.last_samples_source = 'BASE_TABLE'
+        self.last_samples_missing_tags = 0
+        self.last_samples_missing_ratio = 0.0
 
     def fetch_dashboard(self, *, fresh: bool = False) -> DashboardCoreOut:
         now = monotonic()
@@ -722,11 +724,15 @@ class AtalayaDataRepository:
 
         if not normalized_tags:
             self.last_samples_source = 'EMPTY'
+            self.last_samples_missing_tags = 0
+            self.last_samples_missing_ratio = 0.0
             return {}
 
         sample_meta = self._sample_table_meta()
         if sample_meta is None or sample_meta.tag_col is None or sample_meta.value_col is None:
             self.last_samples_source = 'NO_SAMPLE_META'
+            self.last_samples_missing_tags = len(normalized_tags)
+            self.last_samples_missing_ratio = 1.0
             return {}
 
         def _reduce_rows(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -749,10 +755,14 @@ class AtalayaDataRepository:
         summary_rows = self._fetch_latest_samples_from_summary(normalized_tags)
         reduced = _reduce_rows(summary_rows)
         if len(reduced) == len(set(normalized_tags)):
+            self.last_samples_missing_tags = 0
+            self.last_samples_missing_ratio = 0.0
             return reduced
 
         missing = [tag_norm for tag_norm in normalized_tags if tag_norm not in reduced]
         if not missing:
+            self.last_samples_missing_tags = 0
+            self.last_samples_missing_ratio = 0.0
             return reduced
 
         fast_rows = self._fetch_latest_samples_by_tag_exact(
@@ -767,6 +777,35 @@ class AtalayaDataRepository:
         if not missing:
             if self.last_samples_source != 'MATVIEW':
                 self.last_samples_source = 'BASE_TABLE_EXACT'
+            self.last_samples_missing_tags = 0
+            self.last_samples_missing_ratio = 0.0
+            return reduced
+
+        normalized_rows = self._fetch_latest_samples_by_tag_normalized(sample_meta, missing)
+        normalized_reduced = _reduce_rows(normalized_rows)
+        if normalized_reduced:
+            reduced.update(normalized_reduced)
+
+        missing = [tag_norm for tag_norm in normalized_tags if tag_norm not in reduced]
+        if not missing:
+            if self.last_samples_source != 'MATVIEW':
+                self.last_samples_source = 'BASE_TABLE_NORM'
+            self.last_samples_missing_tags = 0
+            self.last_samples_missing_ratio = 0.0
+            return reduced
+
+        missing_ratio = (len(missing) / max(1, len(normalized_tags))) if normalized_tags else 0.0
+        self.last_samples_missing_tags = len(missing)
+        self.last_samples_missing_ratio = missing_ratio
+        allow_fallback = (
+            len(missing) <= max(0, int(settings.latest_samples_fallback_max_missing_tags))
+            and missing_ratio <= max(0.0, float(settings.latest_samples_fallback_max_missing_ratio))
+        )
+        if not allow_fallback:
+            if self.last_samples_source == 'MATVIEW':
+                self.last_samples_source = 'MATVIEW_PARTIAL'
+            else:
+                self.last_samples_source = 'BASE_TABLE_EXACT_PARTIAL'
             return reduced
 
         normalized_rows = self._fetch_latest_samples_by_tag_normalized(sample_meta, missing)
@@ -798,6 +837,8 @@ class AtalayaDataRepository:
             reduced.update(fallback_reduced)
             if self.last_samples_source != 'MATVIEW':
                 self.last_samples_source = 'BASE_TABLE_FALLBACK'
+            self.last_samples_missing_tags = max(0, len(normalized_tags) - len(reduced))
+            self.last_samples_missing_ratio = self.last_samples_missing_tags / max(1, len(normalized_tags))
         return reduced
 
     def _fetch_latest_samples_by_tag_normalized(
