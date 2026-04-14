@@ -41,6 +41,13 @@ class ConfigDbPoolAliasesTests(unittest.TestCase):
         settings = Settings()
         self.assertEqual(settings.estimated_db_connection_peak, 18)
 
+    def test_latest_samples_fallback_thresholds_are_loaded(self) -> None:
+        os.environ['LATEST_SAMPLES_FALLBACK_MAX_MISSING_TAGS'] = '1'
+        os.environ['LATEST_SAMPLES_FALLBACK_MAX_MISSING_RATIO'] = '0.2'
+        settings = Settings()
+        self.assertEqual(settings.latest_samples_fallback_max_missing_tags, 1)
+        self.assertAlmostEqual(settings.latest_samples_fallback_max_missing_ratio, 0.2)
+
 
 if __name__ == '__main__':
     unittest.main()
