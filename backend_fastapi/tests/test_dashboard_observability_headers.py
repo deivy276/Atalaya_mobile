@@ -25,6 +25,7 @@ class _FakeRepository:
         self.last_samples_missing_ratio = 0.125
         self.last_samples_resolution_ms = 4.2
         self.last_samples_fallback_used = False
+        self.last_samples_fallback_blocked = True
         self.last_alerts_cache_status = 'HIT'
         self.last_alerts_source = 'SUMMARY'
         self.last_alerts_text_repairs = 0
@@ -89,6 +90,7 @@ class DashboardObservabilityHeaderTests(unittest.TestCase):
         self.assertEqual(response.headers.get('X-Samples-Missing-Ratio'), '0.125')
         self.assertEqual(response.headers.get('X-Samples-Resolution-Ms'), '4.2')
         self.assertEqual(response.headers.get('X-Samples-Fallback-Used'), 'false')
+        self.assertEqual(response.headers.get('X-Samples-Fallback-Blocked'), 'true')
 
     def test_dashboard_full_includes_samples_observability_headers(self) -> None:
         with TestClient(app) as client:
@@ -100,6 +102,7 @@ class DashboardObservabilityHeaderTests(unittest.TestCase):
         self.assertEqual(response.headers.get('X-Samples-Missing-Ratio'), '0.125')
         self.assertEqual(response.headers.get('X-Samples-Resolution-Ms'), '4.2')
         self.assertEqual(response.headers.get('X-Samples-Fallback-Used'), 'false')
+        self.assertEqual(response.headers.get('X-Samples-Fallback-Blocked'), 'true')
 
     def test_dashboard_diagnostics_reports_samples_observability_fields(self) -> None:
         with TestClient(app) as client:
@@ -114,6 +117,7 @@ class DashboardObservabilityHeaderTests(unittest.TestCase):
         self.assertEqual(payload.get('samplesMissingRatio'), 0.125)
         self.assertEqual(payload.get('samplesResolutionMs'), 4.2)
         self.assertEqual(payload.get('samplesFallbackUsed'), False)
+        self.assertEqual(payload.get('samplesFallbackBlocked'), True)
         self.assertEqual(payload.get('configuredVariables'), 1)
 
 

@@ -29,6 +29,7 @@ class LatestSamplesResolutionTests(unittest.TestCase):
                                     self.assertIn('spp', result)
                                     self.assertNotIn('rpm', result)
                                     self.assertEqual(repo.last_samples_source, 'BASE_TABLE_EXACT_PARTIAL')
+                                    self.assertTrue(repo.last_samples_fallback_blocked)
                                     fallback.assert_not_called()
 
 
@@ -72,6 +73,7 @@ class LatestSamplesResolutionTests(unittest.TestCase):
                             self.assertIn('rpm', result)
                             self.assertEqual(repo.last_samples_source, 'BASE_TABLE_NORM')
                             self.assertFalse(repo.last_samples_fallback_used)
+                            self.assertFalse(repo.last_samples_fallback_blocked)
                             self.assertGreaterEqual(repo.last_samples_resolution_ms, 0.0)
                             fallback.assert_not_called()
 
@@ -95,6 +97,7 @@ class LatestSamplesResolutionTests(unittest.TestCase):
                                     self.assertIn('rpm', result)
                                     self.assertEqual(repo.last_samples_source, 'BASE_TABLE_FALLBACK')
                                     self.assertTrue(repo.last_samples_fallback_used)
+                                    self.assertFalse(repo.last_samples_fallback_blocked)
                                     self.assertGreaterEqual(repo.last_samples_resolution_ms, 0.0)
                                     fallback.assert_called_once()
 

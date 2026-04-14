@@ -79,6 +79,7 @@ class DashboardDiagnosticsOut(BaseModel):
     samplesMissingRatio: float
     samplesResolutionMs: float
     samplesFallbackUsed: bool
+    samplesFallbackBlocked: bool
     configuredVariables: int
 
 

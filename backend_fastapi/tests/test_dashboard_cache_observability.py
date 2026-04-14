@@ -24,6 +24,7 @@ class DashboardCacheObservabilityTests(unittest.TestCase):
         repo.last_samples_missing_ratio = 0.99
         repo.last_samples_resolution_ms = 999.9
         repo.last_samples_fallback_used = True
+        repo.last_samples_fallback_blocked = True
 
         with patch('backend_fastapi.app.repositories.atalaya_repository.settings.dashboard_cache_ttl_seconds', 60):
             with patch.object(AtalayaDataRepository, '_dashboard_cache_value', cached_payload):
@@ -38,6 +39,7 @@ class DashboardCacheObservabilityTests(unittest.TestCase):
         self.assertEqual(repo.last_samples_missing_ratio, 0.0)
         self.assertEqual(repo.last_samples_resolution_ms, 0.0)
         self.assertFalse(repo.last_samples_fallback_used)
+        self.assertFalse(repo.last_samples_fallback_blocked)
 
 
 if __name__ == '__main__':

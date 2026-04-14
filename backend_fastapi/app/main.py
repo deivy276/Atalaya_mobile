@@ -305,6 +305,7 @@ def get_dashboard(
                 'samples_source': repository.last_samples_source,
                 'samples_resolution_ms': round(repository.last_samples_resolution_ms, 1),
                 'samples_fallback_used': repository.last_samples_fallback_used,
+                'samples_fallback_blocked': repository.last_samples_fallback_blocked,
             }
         ),
     )
@@ -315,6 +316,7 @@ def get_dashboard(
     response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
     response.headers['X-Samples-Resolution-Ms'] = f'{repository.last_samples_resolution_ms:.1f}'
     response.headers['X-Samples-Fallback-Used'] = str(repository.last_samples_fallback_used).lower()
+    response.headers['X-Samples-Fallback-Blocked'] = str(repository.last_samples_fallback_blocked).lower()
     return payload
 
 
@@ -334,6 +336,7 @@ def get_dashboard_diagnostics(
         samplesMissingRatio=repository.last_samples_missing_ratio,
         samplesResolutionMs=repository.last_samples_resolution_ms,
         samplesFallbackUsed=repository.last_samples_fallback_used,
+        samplesFallbackBlocked=repository.last_samples_fallback_blocked,
         configuredVariables=configured_variables,
     )
 
@@ -362,6 +365,7 @@ def get_dashboard_full(
                 'samples_source': repository.last_samples_source,
                 'samples_resolution_ms': round(repository.last_samples_resolution_ms, 1),
                 'samples_fallback_used': repository.last_samples_fallback_used,
+                'samples_fallback_blocked': repository.last_samples_fallback_blocked,
                 'alerts_cache_status': repository.last_alerts_cache_status,
             }
         ),
@@ -373,6 +377,7 @@ def get_dashboard_full(
     response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
     response.headers['X-Samples-Resolution-Ms'] = f'{repository.last_samples_resolution_ms:.1f}'
     response.headers['X-Samples-Fallback-Used'] = str(repository.last_samples_fallback_used).lower()
+    response.headers['X-Samples-Fallback-Blocked'] = str(repository.last_samples_fallback_blocked).lower()
     response.headers['X-Alerts-Cache-Status'] = repository.last_alerts_cache_status
     response.headers['X-Alerts-Source'] = repository.last_alerts_source
     response.headers['X-Alerts-Text-Repairs'] = str(repository.last_alerts_text_repairs)

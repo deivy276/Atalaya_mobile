@@ -126,6 +126,7 @@ class AtalayaDataRepository:
         self.last_samples_missing_ratio = 0.0
         self.last_samples_resolution_ms = 0.0
         self.last_samples_fallback_used = False
+        self.last_samples_fallback_blocked = False
 
     def fetch_dashboard(self, *, fresh: bool = False) -> DashboardCoreOut:
         now = monotonic()
@@ -141,6 +142,7 @@ class AtalayaDataRepository:
                     self.last_samples_missing_ratio = 0.0
                     self.last_samples_resolution_ms = 0.0
                     self.last_samples_fallback_used = False
+                    self.last_samples_fallback_blocked = False
                     return copy.deepcopy(cached)
 
         self.last_dashboard_cache_status = 'MISS'
@@ -718,6 +720,7 @@ class AtalayaDataRepository:
     def _fetch_latest_samples_by_tag(self, tags: list[str]) -> dict[str, dict[str, Any]]:
         started_at = monotonic()
         self.last_samples_fallback_used = False
+        self.last_samples_fallback_blocked = False
         try:
             normalized_tags: list[str] = []
             wanted_rows: list[tuple[str, str, str]] = []
@@ -812,6 +815,7 @@ class AtalayaDataRepository:
                 and missing_ratio <= max(0.0, float(settings.latest_samples_fallback_max_missing_ratio))
             )
             if not allow_fallback:
+                self.last_samples_fallback_blocked = True
                 if self.last_samples_source == 'MATVIEW':
                     self.last_samples_source = 'MATVIEW_PARTIAL'
                 elif normalized_reduced:
