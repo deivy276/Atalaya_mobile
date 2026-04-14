@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/trend_range.dart';
 import '../../core/theme/layout_tokens.dart';
@@ -25,9 +26,18 @@ class DashboardV2Screen extends ConsumerStatefulWidget {
 }
 
 class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
+  static const String _densityPrefKey = 'dashboard_v2_density_mode';
+  static const String _layoutPrefKey = 'dashboard_v2_tile_layout_mode';
+
   String? _selectedVariableTag;
   _DensityMode _densityMode = _DensityMode.comfortable;
   _TileLayoutMode _tileLayoutMode = _TileLayoutMode.grid;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLayoutPreferences();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,9 +104,9 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                 status: uiModel.wellStatus,
                 selectedVariableId: uiModel.selectedVariableId,
                 densityMode: _densityMode,
-                onDensityChanged: (mode) => setState(() => _densityMode = mode),
+                onDensityChanged: _setDensityMode,
                 layoutMode: _tileLayoutMode,
-                onLayoutChanged: (mode) => setState(() => _tileLayoutMode = mode),
+                onLayoutChanged: _setTileLayoutMode,
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -158,9 +168,9 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       status: uiModel.wellStatus,
                       selectedVariableId: uiModel.selectedVariableId,
                       densityMode: _densityMode,
-                      onDensityChanged: (mode) => setState(() => _densityMode = mode),
+                      onDensityChanged: _setDensityMode,
                       layoutMode: _tileLayoutMode,
-                      onLayoutChanged: (mode) => setState(() => _tileLayoutMode = mode),
+                      onLayoutChanged: _setTileLayoutMode,
                     ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -270,6 +280,44 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       if (tile.id == _selectedVariableTag) return tile;
     }
     return null;
+  }
+
+  Future<void> _loadLayoutPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    final densityRaw = prefs.getString(_densityPrefKey);
+    final layoutRaw = prefs.getString(_layoutPrefKey);
+    setState(() {
+      _densityMode = _DensityMode.values.firstWhere(
+        (value) => value.name == densityRaw,
+        orElse: () => _DensityMode.comfortable,
+      );
+      _tileLayoutMode = _TileLayoutMode.values.firstWhere(
+        (value) => value.name == layoutRaw,
+        orElse: () => _TileLayoutMode.grid,
+      );
+    });
+  }
+
+  void _setDensityMode(_DensityMode mode) {
+    setState(() => _densityMode = mode);
+    _persistDensityMode(mode);
+  }
+
+  void _setTileLayoutMode(_TileLayoutMode mode) {
+    setState(() => _tileLayoutMode = mode);
+    _persistTileLayoutMode(mode);
+  }
+
+  Future<void> _persistDensityMode(_DensityMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_densityPrefKey, mode.name);
+  }
+
+  Future<void> _persistTileLayoutMode(_TileLayoutMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_layoutPrefKey, mode.name);
   }
 
   DashboardUiModel _buildUiModel(
@@ -477,7 +525,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     selected: <_DensityMode>{_densityMode},
                     onSelectionChanged: (selection) {
                       if (selection.isNotEmpty) {
-                        setState(() => _densityMode = selection.first);
+                        _setDensityMode(selection.first);
                         setSheetState(() {});
                       }
                     },
@@ -507,7 +555,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     selected: <_TileLayoutMode>{_tileLayoutMode},
                     onSelectionChanged: (selection) {
                       if (selection.isNotEmpty) {
-                        setState(() => _tileLayoutMode = selection.first);
+                        _setTileLayoutMode(selection.first);
                         setSheetState(() {});
                       }
                     },
