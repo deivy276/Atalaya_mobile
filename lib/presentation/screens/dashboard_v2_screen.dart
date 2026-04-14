@@ -540,91 +540,91 @@ class _DashboardHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                style: const TextStyle(
-                  color: LayoutTokens.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 20,
+        Text(
+          title,
+          style: const TextStyle(
+            color: LayoutTokens.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          status,
+          style: const TextStyle(color: LayoutTokens.textSecondary),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            if (selectedVariableId != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: LayoutTokens.surfaceCard,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: LayoutTokens.dividerSubtle),
+                ),
+                child: Text(
+                  'Tag: $selectedVariableId',
+                  style: const TextStyle(
+                    color: LayoutTokens.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                status,
-                style: const TextStyle(color: LayoutTokens.textSecondary),
+            SegmentedButton<_DensityMode>(
+              style: ButtonStyle(
+                foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+                backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
               ),
-            ],
-          ),
-        ),
-        if (selectedVariableId != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: LayoutTokens.surfaceCard,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: LayoutTokens.dividerSubtle),
+              showSelectedIcon: false,
+              segments: const <ButtonSegment<_DensityMode>>[
+                ButtonSegment<_DensityMode>(
+                  value: _DensityMode.compact,
+                  label: Text('Compacto'),
+                ),
+                ButtonSegment<_DensityMode>(
+                  value: _DensityMode.comfortable,
+                  label: Text('Cómodo'),
+                ),
+              ],
+              selected: <_DensityMode>{densityMode},
+              onSelectionChanged: (selection) {
+                if (selection.isNotEmpty) {
+                  onDensityChanged(selection.first);
+                }
+              },
             ),
-            child: Text(
-              'Tag: $selectedVariableId',
-              style: const TextStyle(
-                color: LayoutTokens.textSecondary,
-                fontSize: 12,
+            SegmentedButton<_TileLayoutMode>(
+              style: ButtonStyle(
+                foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+                backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
               ),
-            ),
-          ),
-        const SizedBox(width: 8),
-        SegmentedButton<_DensityMode>(
-          style: ButtonStyle(
-            foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-            backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
-          ),
-          showSelectedIcon: false,
-          segments: const <ButtonSegment<_DensityMode>>[
-            ButtonSegment<_DensityMode>(
-              value: _DensityMode.compact,
-              label: Text('Compacto'),
-            ),
-            ButtonSegment<_DensityMode>(
-              value: _DensityMode.comfortable,
-              label: Text('Cómodo'),
+              showSelectedIcon: false,
+              segments: const <ButtonSegment<_TileLayoutMode>>[
+                ButtonSegment<_TileLayoutMode>(
+                  value: _TileLayoutMode.grid,
+                  icon: Icon(Icons.grid_view_rounded, size: 18),
+                ),
+                ButtonSegment<_TileLayoutMode>(
+                  value: _TileLayoutMode.list,
+                  icon: Icon(Icons.view_agenda_rounded, size: 18),
+                ),
+              ],
+              selected: <_TileLayoutMode>{layoutMode},
+              onSelectionChanged: (selection) {
+                if (selection.isNotEmpty) {
+                  onLayoutChanged(selection.first);
+                }
+              },
             ),
           ],
-          selected: <_DensityMode>{densityMode},
-          onSelectionChanged: (selection) {
-            if (selection.isNotEmpty) {
-              onDensityChanged(selection.first);
-            }
-          },
-        ),
-        const SizedBox(width: 8),
-        SegmentedButton<_TileLayoutMode>(
-          style: ButtonStyle(
-            foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-            backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
-          ),
-          showSelectedIcon: false,
-          segments: const <ButtonSegment<_TileLayoutMode>>[
-            ButtonSegment<_TileLayoutMode>(
-              value: _TileLayoutMode.grid,
-              icon: Icon(Icons.grid_view_rounded, size: 18),
-            ),
-            ButtonSegment<_TileLayoutMode>(
-              value: _TileLayoutMode.list,
-              icon: Icon(Icons.view_agenda_rounded, size: 18),
-            ),
-          ],
-          selected: <_TileLayoutMode>{layoutMode},
-          onSelectionChanged: (selection) {
-            if (selection.isNotEmpty) {
-              onLayoutChanged(selection.first);
-            }
-          },
         ),
       ],
     );
