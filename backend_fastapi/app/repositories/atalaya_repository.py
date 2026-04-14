@@ -808,29 +808,6 @@ class AtalayaDataRepository:
                 self.last_samples_source = 'BASE_TABLE_EXACT_PARTIAL'
             return reduced
 
-        normalized_rows = self._fetch_latest_samples_by_tag_normalized(sample_meta, missing)
-        normalized_reduced = _reduce_rows(normalized_rows)
-        if normalized_reduced:
-            reduced.update(normalized_reduced)
-
-        missing = [tag_norm for tag_norm in normalized_tags if tag_norm not in reduced]
-        if not missing:
-            if self.last_samples_source != 'MATVIEW':
-                self.last_samples_source = 'BASE_TABLE_NORM'
-            return reduced
-
-        missing_ratio = (len(missing) / max(1, len(normalized_tags))) if normalized_tags else 0.0
-        allow_fallback = (
-            len(missing) <= max(0, int(settings.latest_samples_fallback_max_missing_tags))
-            and missing_ratio <= max(0.0, float(settings.latest_samples_fallback_max_missing_ratio))
-        )
-        if not allow_fallback:
-            if self.last_samples_source == 'MATVIEW':
-                self.last_samples_source = 'MATVIEW_PARTIAL'
-            else:
-                self.last_samples_source = 'BASE_TABLE_EXACT_PARTIAL'
-            return reduced
-
         fallback_rows = self._fetch_latest_samples_by_tag_fallback(sample_meta, missing)
         fallback_reduced = _reduce_rows(fallback_rows)
         if fallback_reduced:
