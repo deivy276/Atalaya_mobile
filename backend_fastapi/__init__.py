@@ -1,0 +1,1 @@
+"""Atalaya FastAPI package root."""
