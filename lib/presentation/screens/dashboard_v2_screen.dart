@@ -996,23 +996,26 @@ class _ControlsStatusSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: 'Estado actual $currentStatus con $currentTileCount variables visibles',
-      child: Row(
-        children: <Widget>[
-          Icon(
-            Icons.circle,
-            size: 10,
-            color: currentStatusColor,
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              'Estado: $currentStatus · Variables: $currentTileCount',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: LayoutTokens.textMuted),
+      child: Tooltip(
+        message: 'Estado: $currentStatus | Variables visibles: $currentTileCount',
+        child: Row(
+          children: <Widget>[
+            Icon(
+              Icons.circle,
+              size: 10,
+              color: currentStatusColor,
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Estado: $currentStatus · Variables: $currentTileCount',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: LayoutTokens.textMuted),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
