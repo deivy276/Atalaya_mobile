@@ -769,6 +769,18 @@ class AtalayaDataRepository:
                 self.last_samples_source = 'BASE_TABLE_EXACT'
             return reduced
 
+        missing_ratio = (len(missing) / max(1, len(normalized_tags))) if normalized_tags else 0.0
+        allow_fallback = (
+            len(missing) <= max(0, int(settings.latest_samples_fallback_max_missing_tags))
+            and missing_ratio <= max(0.0, float(settings.latest_samples_fallback_max_missing_ratio))
+        )
+        if not allow_fallback:
+            if self.last_samples_source == 'MATVIEW':
+                self.last_samples_source = 'MATVIEW_PARTIAL'
+            else:
+                self.last_samples_source = 'BASE_TABLE_EXACT_PARTIAL'
+            return reduced
+
         fallback_rows = self._fetch_latest_samples_by_tag_fallback(sample_meta, missing)
         fallback_reduced = _reduce_rows(fallback_rows)
         if fallback_reduced:
@@ -944,14 +956,15 @@ class AtalayaDataRepository:
             return cls._latest_samples_summary_meta_cache
 
         schema, table = self._split_qualified_name(settings.latest_samples_summary_name)
-        if not self._matview_exists(schema, table):
+        if not self._matview_exists(schema, table) and not self._table_exists(schema, table):
             cls._latest_samples_summary_detection_done = True
             cls._latest_samples_summary_meta_cache = None
             return None
 
         # PostgreSQL materialized views are visible in pg_matviews, but in some
         # environments they do not surface through information_schema.columns.
-        # Use pg_catalog for column discovery so we can reliably detect the MV.
+        # Use pg_catalog for column discovery so we can reliably detect the MV
+        # and also support plain tables used as latest-by-tag stores.
         columns = self._get_relation_columns(schema, table)
         required = {'tag_norm', 'actual_tag', 'value', 'created_at'}
         if not required.issubset(set(columns)):
