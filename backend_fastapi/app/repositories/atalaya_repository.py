@@ -765,9 +765,10 @@ class AtalayaDataRepository:
             self.last_samples_missing_ratio = 0.0
             return reduced
 
+        missing_set = set(missing)
         fast_rows = self._fetch_latest_samples_by_tag_exact(
             sample_meta,
-            [row for row in wanted_rows if row[0] in set(missing)],
+            [row for row in wanted_rows if row[0] in missing_set],
         )
         fast_reduced = _reduce_rows(fast_rows)
         if fast_reduced:
@@ -804,6 +805,8 @@ class AtalayaDataRepository:
         if not allow_fallback:
             if self.last_samples_source == 'MATVIEW':
                 self.last_samples_source = 'MATVIEW_PARTIAL'
+            elif normalized_reduced:
+                self.last_samples_source = 'BASE_TABLE_NORM_PARTIAL'
             else:
                 self.last_samples_source = 'BASE_TABLE_EXACT_PARTIAL'
             return reduced
