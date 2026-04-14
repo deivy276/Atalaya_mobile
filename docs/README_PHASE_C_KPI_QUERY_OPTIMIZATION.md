@@ -30,3 +30,22 @@ con source `MATVIEW_PARTIAL` o `BASE_TABLE_EXACT_PARTIAL`.
 - Schedule (pg_cron): `sql/schedule_refresh_atalaya_latest_samples_mv.sql`
 - Alternativa latest-by-tag por trigger: `sql/atalaya_latest_by_tag_table.sql`
 
+
+
+## Verificación de rendimiento (Fase C)
+
+- Script comparativo de rutas KPI: `checks/check_v4_kpi_query_paths_benchmark.py`
+  - Ejecuta `EXPLAIN (ANALYZE, BUFFERS)` para:
+    1. `SUMMARY_MV` (lookup por `tag_norm` en `atalaya_latest_samples_mv`)
+    2. `BASE_TABLE_EXACT` (tags exactos `plain/dotted`)
+    3. `BASE_TABLE_NORM` (`DISTINCT ON` con normalización)
+- Ejemplo:
+  - `python checks/check_v4_kpi_query_paths_benchmark.py --tags spp,rpm,wob`
+
+## Avance Fase C
+
+- Avance técnico estimado: **99%**.
+- Pendiente para cierre al 100%:
+  1. Ejecutar benchmark en entorno con datos reales.
+  2. Registrar latencias p50/p95 por ruta.
+  3. Confirmar reducción sostenida del uso de fallback pesado.
