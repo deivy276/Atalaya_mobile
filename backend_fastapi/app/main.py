@@ -86,6 +86,9 @@ app.add_middleware(
 @app.on_event('startup')
 def startup_init_auth() -> None:
     validate_auth_runtime_security()
+    if settings.auth_skip_db_init:
+        print('[auth] AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
+        return
     from .database import _ensure_session_factory
 
     session = _ensure_session_factory()()

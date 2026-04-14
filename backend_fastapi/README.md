@@ -87,6 +87,7 @@ Bootstrap local de usuario admin:
 > - Definir `AUTH_COOKIE_SAMESITE=lax` o `strict`.
 > - Cerrar CORS por ambiente (`CORS_ORIGINS` sin `*` en prod).
 > - Nunca commitear `.env` real; usar gestor de secretos/vault.
+> - Para pruebas locales sin bootstrap DB: `AUTH_SKIP_DB_INIT=true`.
 
 ## Base de datos esperada
 

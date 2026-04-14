@@ -313,14 +313,55 @@ def _seed_rbac(db: Session) -> None:
 
 
 def _seed_rbac(db: Session) -> None:
-    for permission in ('dashboard:read', 'alerts:read', 'control_panel:write', 'users:manage', 'sessions:revoke', 'mfa:manage'):
+    for permission in (
+        'telemetry:read',
+        'kpis:read',
+        'alerts:read',
+        'operations:execute',
+        'predictor:write',
+        'control_panel:write',
+        'users:manage',
+        'roles:manage',
+        'config:write',
+        'sessions:revoke',
+        'mfa:manage',
+    ):
         db.execute(text('INSERT INTO permissions(code) VALUES (:code) ON CONFLICT(code) DO NOTHING'), {'code': permission})
 
     roles = {
-        'admin': ['dashboard:read', 'alerts:read', 'control_panel:write', 'users:manage', 'sessions:revoke', 'mfa:manage'],
-        'specialist': ['dashboard:read', 'alerts:read', 'control_panel:write', 'mfa:manage'],
-        'operator': ['dashboard:read', 'alerts:read'],
-        'viewer': ['dashboard:read', 'alerts:read'],
+        'admin': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+            'operations:execute',
+            'predictor:write',
+            'control_panel:write',
+            'users:manage',
+            'roles:manage',
+            'config:write',
+            'sessions:revoke',
+            'mfa:manage',
+        ],
+        'specialist': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+            'predictor:write',
+            'control_panel:write',
+            'sessions:revoke',
+            'mfa:manage',
+        ],
+        'operator': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+            'operations:execute',
+        ],
+        'viewer': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+        ],
     }
     for role_name, permissions in roles.items():
         db.execute(text('INSERT INTO roles(name) VALUES (:name) ON CONFLICT(name) DO NOTHING'), {'name': role_name})
