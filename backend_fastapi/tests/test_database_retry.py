@@ -12,6 +12,9 @@ def _operational_error(message: str) -> OperationalError:
 
 class _FakeDialect:
     class dbapi:
+        class OperationalError(Exception):
+            pass
+
         connect = None
 
 
@@ -29,7 +32,7 @@ class DatabaseRetryTests(unittest.TestCase):
         def _fake_connect(*args, **kwargs):
             calls['count'] += 1
             if calls['count'] == 1:
-                raise RuntimeError('could not connect')
+                raise _FakeDialect.dbapi.OperationalError('could not connect')
             return object()
 
         dialect = _FakeDialect()
@@ -43,16 +46,24 @@ class DatabaseRetryTests(unittest.TestCase):
 
     def test_connect_with_retry_does_not_retry_non_transient(self) -> None:
         dialect = _FakeDialect()
-        dialect.dbapi.connect = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError('syntax error at or near "FROM"'))
+        dialect.dbapi.connect = lambda *args, **kwargs: (_ for _ in ()).throw(
+            _FakeDialect.dbapi.OperationalError('syntax error at or near "FROM"')
+        )
         with patch.object(database.settings, 'db_retry_attempts', 3):
             with patch.object(database.settings, 'db_retry_backoff_ms', 0):
-                with self.assertRaises(RuntimeError):
+                with self.assertRaises(_FakeDialect.dbapi.OperationalError):
                     database._connect_with_retry(dialect, (), {})
 
     def test_merge_connect_options_preserves_existing_flags(self) -> None:
         merged = database._merge_connect_options('-c application_name=atalaya')
         self.assertIn('application_name=atalaya', merged)
         self.assertIn('statement_timeout=', merged)
+
+    def test_connect_with_retry_does_not_swallow_non_operational_exception(self) -> None:
+        dialect = _FakeDialect()
+        dialect.dbapi.connect = lambda *args, **kwargs: (_ for _ in ()).throw(ValueError('bad params'))
+        with self.assertRaises(ValueError):
+            database._connect_with_retry(dialect, (), {})
 
 
 if __name__ == '__main__':

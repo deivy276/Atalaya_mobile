@@ -56,6 +56,9 @@ def _connect_with_retry(dialect, cargs, cparams):
         try:
             return dialect.dbapi.connect(*cargs, **connect_kwargs)
         except Exception as exc:
+            operational_error_type = getattr(dialect.dbapi, 'OperationalError', None)
+            if operational_error_type is None or not isinstance(exc, operational_error_type):
+                raise
             if not _is_transient_operational_error(exc) or attempt == attempts - 1:
                 raise
             sleep(backoff_seconds * (2**attempt))
