@@ -2,6 +2,7 @@ from time import perf_counter
 from time import sleep
 import traceback
 import json
+import logging
 from collections import defaultdict, deque
 from threading import Lock
 from time import monotonic
@@ -72,6 +73,7 @@ from .schemas import (
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+logger = logging.getLogger(__name__)
 _rate_limit_lock = Lock()
 _rate_limit_buckets: dict[str, deque[float]] = defaultdict(deque)
 
@@ -88,10 +90,11 @@ app.add_middleware(
 def startup_init_auth() -> None:
     validate_auth_runtime_security()
     if settings.db_connection_budget > 0 and settings.estimated_db_connection_peak > settings.db_connection_budget:
-        print(
-            '[db] WARNING estimated connection peak exceeds configured budget: '
-            f"peak={settings.estimated_db_connection_peak}, budget={settings.db_connection_budget}. "
-            'Tune APP_WORKERS / POOL_SIZE / MAX_OVERFLOW.'
+        logger.warning(
+            'Estimated DB connection peak exceeds configured budget: peak=%s budget=%s. '
+            'Tune APP_WORKERS / POOL_SIZE / MAX_OVERFLOW.',
+            settings.estimated_db_connection_peak,
+            settings.db_connection_budget,
         )
     if settings.auth_skip_db_init:
         print('[auth] AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
