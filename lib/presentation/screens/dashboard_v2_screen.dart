@@ -574,6 +574,12 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
 
   Future<void> _openLayoutControls() async {
+    final dashboardState = ref.read(dashboardControllerProvider).valueOrNull;
+    final currentTileCount = dashboardState?.payload.variables.take(6).length ?? 0;
+    final currentStatus = dashboardState == null
+        ? 'Sin datos'
+        : (dashboardState.connectionStatus == ConnectionStatus.connected ? 'En línea' : 'Desactualizado');
+
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0A162A),
@@ -602,6 +608,11 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     Text(
                       'Actual: ${_densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo'} · '
                       '${_tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista'}',
+                      style: const TextStyle(color: LayoutTokens.textMuted),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Estado: $currentStatus · Variables: $currentTileCount',
                       style: const TextStyle(color: LayoutTokens.textMuted),
                     ),
                     const SizedBox(height: 12),
