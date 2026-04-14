@@ -1,7 +1,7 @@
 from time import perf_counter
 from time import sleep
-import traceback
 import json
+import logging
 from collections import defaultdict, deque
 from threading import Lock
 from time import monotonic
@@ -64,6 +64,7 @@ from .schemas import (
     AlertsListOut,
     AttachmentsResponseOut,
     DashboardCoreOut,
+    DashboardDiagnosticsOut,
     DashboardOut,
     HealthDetailsResponse,
     HealthResponse,
@@ -72,6 +73,7 @@ from .schemas import (
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+logger = logging.getLogger(__name__)
 _rate_limit_lock = Lock()
 _rate_limit_buckets: dict[str, deque[float]] = defaultdict(deque)
 
@@ -87,8 +89,15 @@ app.add_middleware(
 @app.on_event('startup')
 def startup_init_auth() -> None:
     validate_auth_runtime_security()
+    if settings.db_connection_budget > 0 and settings.estimated_db_connection_peak > settings.db_connection_budget:
+        logger.warning(
+            'Estimated DB connection peak exceeds configured budget: peak=%s budget=%s. '
+            'Tune APP_WORKERS / POOL_SIZE / MAX_OVERFLOW.',
+            settings.estimated_db_connection_peak,
+            settings.db_connection_budget,
+        )
     if settings.auth_skip_db_init:
-        print('[auth] AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
+        logger.info('AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
         return
     from .database import _ensure_session_factory
 
@@ -99,15 +108,18 @@ def startup_init_auth() -> None:
             session = _ensure_session_factory()()
             init_auth_db(session)
             if attempt > 1:
-                print(f'[auth] init_auth_db succeeded on attempt {attempt}/{max_attempts}')
+                logger.info('init_auth_db succeeded on attempt %s/%s', attempt, max_attempts)
             return
         except (OperationalError, SQLAlchemyError) as exc:
             if attempt >= max_attempts:
-                print(f'[auth] init_auth_db failed after {attempt}/{max_attempts} attempts')
+                logger.error('init_auth_db failed after %s/%s attempts', attempt, max_attempts)
                 raise
-            print(
-                f'[auth] init_auth_db failed ({attempt}/{max_attempts}): '
-                f'{exc.__class__.__name__}. Retrying in {settings.auth_db_init_retry_delay_seconds:.1f}s'
+            logger.warning(
+                'init_auth_db failed (%s/%s): %s. Retrying in %.1fs',
+                attempt,
+                max_attempts,
+                exc.__class__.__name__,
+                settings.auth_db_init_retry_delay_seconds,
             )
             sleep(max(0.0, settings.auth_db_init_retry_delay_seconds))
         finally:
@@ -185,8 +197,7 @@ async def backend_configuration_error_handler(
 
 @app.exception_handler(OperationalError)
 async def operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    print('[fastapi] OperationalError on', request.url.path)
-    traceback.print_exc()
+    logger.exception('[fastapi] OperationalError on %s', request.url.path)
     return JSONResponse(
         status_code=503,
         content={
@@ -202,8 +213,7 @@ async def operational_error_handler(request: Request, exc: OperationalError) -> 
 
 @app.exception_handler(SQLAlchemyError)
 async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
-    print('[fastapi] SQLAlchemyError on', request.url.path)
-    traceback.print_exc()
+    logger.exception('[fastapi] SQLAlchemyError on %s', request.url.path)
     return JSONResponse(
         status_code=500,
         content={
@@ -216,12 +226,11 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JS
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    print('[fastapi] Unhandled exception on', request.url.path)
-    traceback.print_exc()
+    logger.exception('[fastapi] Unhandled exception on %s', request.url.path)
     return JSONResponse(
         status_code=500,
         content={
-            'detail': 'Unexpected server error. The backend printed the traceback in the terminal.',
+            'detail': 'Unexpected server error. Check backend logs for traceback details.',
             'path': request.url.path,
             'error': str(exc)[:240],
             'type': exc.__class__.__name__,
@@ -283,9 +292,9 @@ def get_dashboard(
     started_at = perf_counter()
     payload = repository.fetch_dashboard(fresh=fresh)
     configured_variables = sum(1 for item in payload.variables if item.configured)
-    print(
-        '[dashboard] '
-        + json.dumps(
+    logger.info(
+        '[dashboard] %s',
+        json.dumps(
             {
                 'path': '/api/v1/dashboard',
                 'elapsed_ms': round((perf_counter() - started_at) * 1000.0, 1),
@@ -294,13 +303,42 @@ def get_dashboard(
                 'cache_status': repository.last_dashboard_cache_status,
                 'kp_cache_status': repository.last_kp_cache_status,
                 'samples_source': repository.last_samples_source,
+                'samples_resolution_ms': round(repository.last_samples_resolution_ms, 1),
+                'samples_fallback_used': repository.last_samples_fallback_used,
+                'samples_fallback_blocked': repository.last_samples_fallback_blocked,
             }
-        )
+        ),
     )
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
     response.headers['X-Samples-Source'] = repository.last_samples_source
+    response.headers['X-Samples-Missing-Tags'] = str(repository.last_samples_missing_tags)
+    response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
+    response.headers['X-Samples-Resolution-Ms'] = f'{repository.last_samples_resolution_ms:.1f}'
+    response.headers['X-Samples-Fallback-Used'] = str(repository.last_samples_fallback_used).lower()
+    response.headers['X-Samples-Fallback-Blocked'] = str(repository.last_samples_fallback_blocked).lower()
     return payload
+
+
+@app.get(f'{settings.api_prefix}/dashboard/diagnostics', response_model=DashboardDiagnosticsOut)
+def get_dashboard_diagnostics(
+    fresh: bool = Query(False, description='Bypass dashboard cache for diagnostics.'),
+    repository: AtalayaDataRepository = Depends(get_repository),
+    _: AuthUser | None = Depends(require_authenticated_if_enabled),
+) -> DashboardDiagnosticsOut:
+    payload = repository.fetch_dashboard(fresh=fresh)
+    configured_variables = sum(1 for item in payload.variables if item.configured)
+    return DashboardDiagnosticsOut(
+        cacheStatus=repository.last_dashboard_cache_status,
+        kpCacheStatus=repository.last_kp_cache_status,
+        samplesSource=repository.last_samples_source,
+        samplesMissingTags=repository.last_samples_missing_tags,
+        samplesMissingRatio=repository.last_samples_missing_ratio,
+        samplesResolutionMs=repository.last_samples_resolution_ms,
+        samplesFallbackUsed=repository.last_samples_fallback_used,
+        samplesFallbackBlocked=repository.last_samples_fallback_blocked,
+        configuredVariables=configured_variables,
+    )
 
 
 @app.get(f'{settings.api_prefix}/dashboard/full', response_model=DashboardOut)
@@ -314,9 +352,9 @@ def get_dashboard_full(
     started_at = perf_counter()
     payload = repository.fetch_dashboard_full(fresh=fresh, alerts_fresh=alerts_fresh)
     configured_variables = sum(1 for item in payload.variables if item.configured)
-    print(
-        '[dashboard] '
-        + json.dumps(
+    logger.info(
+        '[dashboard] %s',
+        json.dumps(
             {
                 'path': '/api/v1/dashboard/full',
                 'elapsed_ms': round((perf_counter() - started_at) * 1000.0, 1),
@@ -325,13 +363,21 @@ def get_dashboard_full(
                 'cache_status': repository.last_dashboard_cache_status,
                 'kp_cache_status': repository.last_kp_cache_status,
                 'samples_source': repository.last_samples_source,
+                'samples_resolution_ms': round(repository.last_samples_resolution_ms, 1),
+                'samples_fallback_used': repository.last_samples_fallback_used,
+                'samples_fallback_blocked': repository.last_samples_fallback_blocked,
                 'alerts_cache_status': repository.last_alerts_cache_status,
             }
-        )
+        ),
     )
     response.headers['X-Cache-Status'] = repository.last_dashboard_cache_status
     response.headers['X-KP-Cache-Status'] = repository.last_kp_cache_status
     response.headers['X-Samples-Source'] = repository.last_samples_source
+    response.headers['X-Samples-Missing-Tags'] = str(repository.last_samples_missing_tags)
+    response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
+    response.headers['X-Samples-Resolution-Ms'] = f'{repository.last_samples_resolution_ms:.1f}'
+    response.headers['X-Samples-Fallback-Used'] = str(repository.last_samples_fallback_used).lower()
+    response.headers['X-Samples-Fallback-Blocked'] = str(repository.last_samples_fallback_blocked).lower()
     response.headers['X-Alerts-Cache-Status'] = repository.last_alerts_cache_status
     response.headers['X-Alerts-Source'] = repository.last_alerts_source
     response.headers['X-Alerts-Text-Repairs'] = str(repository.last_alerts_text_repairs)
