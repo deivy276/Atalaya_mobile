@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/layout_tokens.dart';
 
 class LayoutSummaryChips extends StatelessWidget {
+  static const double _compactBreakpoint = 420;
+
   const LayoutSummaryChips({
     super.key,
     required this.tileCount,
@@ -28,7 +30,7 @@ class LayoutSummaryChips extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 420;
+        final compact = constraints.maxWidth < _compactBreakpoint;
 
         return Wrap(
           spacing: compact ? 6 : 8,
