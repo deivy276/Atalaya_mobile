@@ -598,6 +598,12 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                         fontSize: 18,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Actual: ${_densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo'} · '
+                      '${_tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista'}',
+                      style: const TextStyle(color: LayoutTokens.textMuted),
+                    ),
                     const SizedBox(height: 12),
                     const Text(
                       'Densidad',
