@@ -108,6 +108,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                 onDensityChanged: _setDensityMode,
                 layoutMode: _tileLayoutMode,
                 onLayoutChanged: _setTileLayoutMode,
+                onOpenControls: () => _openLayoutControls(),
               ),
             ),
             SliverToBoxAdapter(
@@ -183,6 +184,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       onDensityChanged: _setDensityMode,
                       layoutMode: _tileLayoutMode,
                       onLayoutChanged: _setTileLayoutMode,
+                      onOpenControls: () => _openLayoutControls(),
                     ),
                   ),
                   SliverToBoxAdapter(
@@ -700,6 +702,7 @@ class _DashboardHeading extends StatelessWidget {
     required this.onDensityChanged,
     required this.layoutMode,
     required this.onLayoutChanged,
+    required this.onOpenControls,
   });
 
   final String title;
@@ -709,6 +712,7 @@ class _DashboardHeading extends StatelessWidget {
   final ValueChanged<_DensityMode> onDensityChanged;
   final _TileLayoutMode layoutMode;
   final ValueChanged<_TileLayoutMode> onLayoutChanged;
+  final VoidCallback onOpenControls;
 
   @override
   Widget build(BuildContext context) {
@@ -755,7 +759,7 @@ class _DashboardHeading extends StatelessWidget {
                     ),
                   ),
                 if (!showInlineControls)
-                  const _CompactControlsHint()
+                  _CompactControlsHint(onTap: onOpenControls)
                 else ...<Widget>[
                   SegmentedButton<_DensityMode>(
                     style: ButtonStyle(
@@ -814,30 +818,39 @@ class _DashboardHeading extends StatelessWidget {
 }
 
 class _CompactControlsHint extends StatelessWidget {
-  const _CompactControlsHint();
+  const _CompactControlsHint({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(Icons.tune_rounded, size: 14, color: LayoutTokens.textSecondary),
-          SizedBox(width: 6),
-          Text(
-            'Más opciones en menú',
-            style: TextStyle(
-              color: LayoutTokens.textSecondary,
-              fontSize: 12,
-            ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: LayoutTokens.surfaceCard,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: LayoutTokens.dividerSubtle),
           ),
-        ],
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(Icons.tune_rounded, size: 14, color: LayoutTokens.textSecondary),
+              SizedBox(width: 6),
+              Text(
+                'Más opciones en menú',
+                style: TextStyle(
+                  color: LayoutTokens.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
