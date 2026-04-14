@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,11 +35,30 @@ class Settings(BaseSettings):
     db_user: str = Field(default='', alias='DB_USER')
     db_password: str = Field(default='', alias='DB_PASSWORD')
     db_sslmode: str = Field(default='require', alias='DB_SSLMODE')
-    db_connect_timeout_seconds: int = Field(default=10, alias='DB_CONNECT_TIMEOUT_SECONDS')
-    db_pool_size: int = Field(default=5, alias='DB_POOL_SIZE')
-    db_max_overflow: int = Field(default=10, alias='DB_MAX_OVERFLOW')
-    db_pool_timeout_seconds: int = Field(default=30, alias='DB_POOL_TIMEOUT_SECONDS')
-    db_pool_recycle_seconds: int = Field(default=300, alias='DB_POOL_RECYCLE_SECONDS')
+    db_connect_timeout_seconds: int = Field(
+        default=10,
+        validation_alias=AliasChoices('DB_CONNECT_TIMEOUT_SECONDS', 'CONNECT_TIMEOUT_SECONDS'),
+    )
+    pool_size: int = Field(
+        default=5,
+        validation_alias=AliasChoices('POOL_SIZE', 'DB_POOL_SIZE'),
+    )
+    max_overflow: int = Field(
+        default=10,
+        validation_alias=AliasChoices('MAX_OVERFLOW', 'DB_MAX_OVERFLOW'),
+    )
+    pool_timeout_seconds: int = Field(
+        default=30,
+        validation_alias=AliasChoices('POOL_TIMEOUT', 'DB_POOL_TIMEOUT_SECONDS'),
+    )
+    pool_recycle_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices('POOL_RECYCLE', 'DB_POOL_RECYCLE_SECONDS'),
+    )
+    statement_timeout_ms: int = Field(default=5000, alias='STATEMENT_TIMEOUT_MS')
+    idle_in_transaction_session_timeout_ms: int = Field(default=15000, alias='IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS')
+    db_retry_attempts: int = Field(default=2, alias='DB_RETRY_ATTEMPTS')
+    db_retry_backoff_ms: int = Field(default=120, alias='DB_RETRY_BACKOFF_MS')
 
     dashboard_alert_limit: int = Field(default=25, alias='DASHBOARD_ALERT_LIMIT')
     stale_threshold_seconds: int = Field(default=10, alias='STALE_THRESHOLD_SECONDS')
@@ -54,7 +73,7 @@ class Settings(BaseSettings):
     auth_enabled: bool = Field(default=False, alias='AUTH_ENABLED')
     auth_skip_db_init: bool = Field(default=False, alias='AUTH_SKIP_DB_INIT')
     app_env: str = Field(default='dev', alias='APP_ENV')
-    auth_secret_key: str = Field(default='change-me-local-dev', alias='AUTH_SECRET_KEY')
+    auth_secret_key: str = Field(default='local-dev-secret-atalaya-rotate-in-prod', alias='AUTH_SECRET_KEY')
     auth_secret_key_dev: str = Field(default='', alias='AUTH_SECRET_KEY_DEV')
     auth_secret_key_stage: str = Field(default='', alias='AUTH_SECRET_KEY_STAGE')
     auth_secret_key_prod: str = Field(default='', alias='AUTH_SECRET_KEY_PROD')
@@ -144,7 +163,7 @@ class Settings(BaseSettings):
         return (
             'postgresql+psycopg://'
             f'{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}'
-            f'?sslmode={self.db_sslmode}&connect_timeout={self.db_connect_timeout_seconds}'
+            f'?sslmode={self.db_sslmode}'
         )
 
 
