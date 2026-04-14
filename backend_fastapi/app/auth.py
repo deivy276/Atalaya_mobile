@@ -307,6 +307,69 @@ def _seed_rbac(db: Session) -> None:
                 {'role_name': role_name, 'permission_code': permission},
             )
 
+    _seed_rbac(db)
+    _seed_bootstrap_admin(db)
+    db.commit()
+
+
+def _seed_rbac(db: Session) -> None:
+    for permission in (
+        'telemetry:read',
+        'kpis:read',
+        'alerts:read',
+        'operations:execute',
+        'predictor:write',
+        'control_panel:write',
+        'users:manage',
+        'roles:manage',
+        'config:write',
+        'sessions:revoke',
+        'mfa:manage',
+    ):
+        db.execute(text('INSERT INTO permissions(code) VALUES (:code) ON CONFLICT(code) DO NOTHING'), {'code': permission})
+
+    roles = {
+        'admin': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+            'operations:execute',
+            'predictor:write',
+            'control_panel:write',
+            'users:manage',
+            'roles:manage',
+            'config:write',
+            'sessions:revoke',
+            'mfa:manage',
+        ],
+        'specialist': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+            'predictor:write',
+            'control_panel:write',
+            'sessions:revoke',
+            'mfa:manage',
+        ],
+        'operator': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+            'operations:execute',
+        ],
+        'viewer': [
+            'telemetry:read',
+            'kpis:read',
+            'alerts:read',
+        ],
+    }
+    for role_name, permissions in roles.items():
+        db.execute(text('INSERT INTO roles(name) VALUES (:name) ON CONFLICT(name) DO NOTHING'), {'name': role_name})
+        for permission in permissions:
+            db.execute(
+                text('INSERT INTO role_permissions(role_id, permission_id) SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = :role_name AND p.code = :permission_code ON CONFLICT(role_id, permission_id) DO NOTHING'),
+                {'role_name': role_name, 'permission_code': permission},
+            )
 
 def _seed_bootstrap_admin(db: Session) -> None:
     settings = get_settings()
