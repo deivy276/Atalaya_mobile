@@ -89,13 +89,10 @@ def _ensure_session_factory():
     _engine = create_engine(
         settings.sqlalchemy_database_url,
         pool_pre_ping=True,
-        pool_recycle=max(0, int(settings.pool_recycle_seconds)),
-        pool_size=max(1, int(settings.pool_size)),
-        max_overflow=max(0, int(settings.max_overflow)),
-        pool_timeout=max(1, int(settings.pool_timeout_seconds)),
-        connect_args={
-            'connect_timeout': max(1, int(settings.db_connect_timeout_seconds)),
-        },
+        pool_recycle=settings.db_pool_recycle_seconds,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout_seconds,
         future=True,
     )
 

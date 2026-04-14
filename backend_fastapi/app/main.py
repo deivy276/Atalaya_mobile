@@ -1,7 +1,7 @@
 from time import perf_counter
 from time import sleep
+import traceback
 import json
-import logging
 from collections import defaultdict, deque
 from threading import Lock
 from time import monotonic
@@ -73,7 +73,6 @@ from .schemas import (
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
-logger = logging.getLogger(__name__)
 _rate_limit_lock = Lock()
 _rate_limit_buckets: dict[str, deque[float]] = defaultdict(deque)
 
@@ -89,15 +88,8 @@ app.add_middleware(
 @app.on_event('startup')
 def startup_init_auth() -> None:
     validate_auth_runtime_security()
-    if settings.db_connection_budget > 0 and settings.estimated_db_connection_peak > settings.db_connection_budget:
-        logger.warning(
-            'Estimated DB connection peak exceeds configured budget: peak=%s budget=%s. '
-            'Tune APP_WORKERS / POOL_SIZE / MAX_OVERFLOW.',
-            settings.estimated_db_connection_peak,
-            settings.db_connection_budget,
-        )
     if settings.auth_skip_db_init:
-        logger.info('AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
+        print('[auth] AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
         return
     from .database import _ensure_session_factory
 
@@ -108,18 +100,15 @@ def startup_init_auth() -> None:
             session = _ensure_session_factory()()
             init_auth_db(session)
             if attempt > 1:
-                logger.info('init_auth_db succeeded on attempt %s/%s', attempt, max_attempts)
+                print(f'[auth] init_auth_db succeeded on attempt {attempt}/{max_attempts}')
             return
         except (OperationalError, SQLAlchemyError) as exc:
             if attempt >= max_attempts:
-                logger.error('init_auth_db failed after %s/%s attempts', attempt, max_attempts)
+                print(f'[auth] init_auth_db failed after {attempt}/{max_attempts} attempts')
                 raise
-            logger.warning(
-                'init_auth_db failed (%s/%s): %s. Retrying in %.1fs',
-                attempt,
-                max_attempts,
-                exc.__class__.__name__,
-                settings.auth_db_init_retry_delay_seconds,
+            print(
+                f'[auth] init_auth_db failed ({attempt}/{max_attempts}): '
+                f'{exc.__class__.__name__}. Retrying in {settings.auth_db_init_retry_delay_seconds:.1f}s'
             )
             sleep(max(0.0, settings.auth_db_init_retry_delay_seconds))
         finally:

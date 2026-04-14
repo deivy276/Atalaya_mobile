@@ -79,8 +79,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
               final isWideLayout = width >= 1100;
 
               return isWideLayout
-                  ? _buildWideLayout(context, viewState, uiModel, payload.well, payload.job, unitPrefs)
-                  : _buildMobileLayout(context, viewState, uiModel, payload.well, payload.job, unitPrefs);
+                  ? _buildWideLayout(context, viewState, uiModel, payload.job, unitPrefs)
+                  : _buildMobileLayout(context, viewState, uiModel, payload.job, unitPrefs);
             },
           ),
         ),
@@ -92,7 +92,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     BuildContext context,
     DashboardViewState viewState,
     DashboardUiModel uiModel,
-    String well,
     String job,
     Map<String, String> unitPrefs,
   ) {
@@ -101,18 +100,22 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     return Stack(
       children: <Widget>[
         CustomScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           slivers: <Widget>[
-            SliverToBoxAdapter(
-              child: _DashboardHeading(
-                title: uiModel.appTitle,
-                status: uiModel.wellStatus,
-                selectedVariableId: uiModel.selectedVariableId,
-                densityMode: _densityMode,
-                onDensityChanged: _setDensityMode,
-                layoutMode: _tileLayoutMode,
-                onLayoutChanged: _setTileLayoutMode,
-                onOpenControls: () => _openLayoutControls(),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate.fixed(<Widget>[
+                  _DashboardHeading(
+                    title: uiModel.appTitle,
+                    status: uiModel.wellStatus,
+                    selectedVariableId: uiModel.selectedVariableId,
+                    densityMode: _densityMode,
+                    onDensityChanged: _setDensityMode,
+                    layoutMode: _tileLayoutMode,
+                    onLayoutChanged: _setTileLayoutMode,
+                    onOpenControls: () => _openLayoutControls(),
+                  ),
+                ]),
               ),
             ),
             SliverToBoxAdapter(
@@ -151,7 +154,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            _buildTilesGrid(viewState, uiModel, well, job, unitPrefs),
+            _buildTilesGrid(viewState, uiModel, job, unitPrefs),
           ],
         ),
         Positioned(
@@ -171,7 +174,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     BuildContext context,
     DashboardViewState viewState,
     DashboardUiModel uiModel,
-    String well,
     String job,
     Map<String, String> unitPrefs,
   ) {
@@ -184,18 +186,22 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
           children: <Widget>[
             Expanded(
               child: CustomScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
                 slivers: <Widget>[
-                  SliverToBoxAdapter(
-                    child: _DashboardHeading(
-                      title: uiModel.appTitle,
-                      status: uiModel.wellStatus,
-                      selectedVariableId: uiModel.selectedVariableId,
-                      densityMode: _densityMode,
-                      onDensityChanged: _setDensityMode,
-                      layoutMode: _tileLayoutMode,
-                      onLayoutChanged: _setTileLayoutMode,
-                      onOpenControls: () => _openLayoutControls(),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate.fixed(<Widget>[
+                        _DashboardHeading(
+                          title: uiModel.appTitle,
+                          status: uiModel.wellStatus,
+                          selectedVariableId: uiModel.selectedVariableId,
+                          densityMode: _densityMode,
+                          onDensityChanged: _setDensityMode,
+                          layoutMode: _tileLayoutMode,
+                          onLayoutChanged: _setTileLayoutMode,
+                          onOpenControls: () => _openLayoutControls(),
+                        ),
+                      ]),
                     ),
                   ),
                   SliverToBoxAdapter(
@@ -234,7 +240,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                  _buildTilesGrid(viewState, uiModel, well, job, unitPrefs),
+                  _buildTilesGrid(viewState, uiModel, job, unitPrefs),
                 ],
               ),
             ),
@@ -258,7 +264,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   Widget _buildTilesGrid(
     DashboardViewState viewState,
     DashboardUiModel uiModel,
-    String well,
     String job,
     Map<String, String> unitPrefs,
   ) {
@@ -281,7 +286,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         accentColor: model.accentColor,
         onTap: () {
           setState(() => _selectedVariableTag = model.id);
-          _openVariableDetail(context, variable, well, job, unitPrefs);
+          _openVariableDetail(context, variable, viewState.payload.well, job, unitPrefs);
         },
       );
     };
@@ -574,7 +579,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
 
   Future<void> _openLayoutControls() async {
-    final dashboardState = ref.read(dashboardControllerProvider).valueOrNull;
+    final dashboardState = ref.read(dashboardControllerProvider).asData?.value;
     final currentTileCount = dashboardState?.payload.variables.take(6).length ?? 0;
     final currentStatus = dashboardState == null
         ? 'Sin datos'
@@ -746,12 +751,19 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final trendAsync = ref.watch(trendControllerProvider(TrendRequest(
+            final displayUnit = UnitConverter.resolveDisplayUnit(
+              slotIndex: variable.slot - 1,
               tag: variable.tag,
-              range: selected,
+              rawUnit: variable.rawUnit,
               well: well,
               job: job,
-              displayUnitPreferences: unitPreferences,
+              preferences: unitPreferences,
+            );
+            final trendAsync = ref.watch(trendSeriesProvider(TrendRequest(
+              tag: variable.tag,
+              rawUnit: variable.rawUnit,
+              displayUnit: displayUnit,
+              range: selected,
             )));
 
             return Padding(
