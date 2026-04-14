@@ -23,6 +23,13 @@ Que `/api/v1/dashboard` lea casi siempre de estructuras optimizadas:
 Si faltan demasiados tags, el backend evita el fallback pesado y responde parcial
 con source `MATVIEW_PARTIAL` o `BASE_TABLE_EXACT_PARTIAL`.
 
+Headers de observabilidad en `/api/v1/dashboard` y `/api/v1/dashboard/full`:
+
+- `X-Samples-Missing-Tags`
+- `X-Samples-Missing-Ratio`
+- `X-Samples-Resolution-Ms`
+- `X-Samples-Fallback-Used`
+
 ## Scripts SQL
 
 - Índices base: `sql/atalaya_v3_indexes.sql`

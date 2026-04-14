@@ -302,6 +302,8 @@ def get_dashboard(
                 'cache_status': repository.last_dashboard_cache_status,
                 'kp_cache_status': repository.last_kp_cache_status,
                 'samples_source': repository.last_samples_source,
+                'samples_resolution_ms': round(repository.last_samples_resolution_ms, 1),
+                'samples_fallback_used': repository.last_samples_fallback_used,
             }
         ),
     )
@@ -310,6 +312,8 @@ def get_dashboard(
     response.headers['X-Samples-Source'] = repository.last_samples_source
     response.headers['X-Samples-Missing-Tags'] = str(repository.last_samples_missing_tags)
     response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
+    response.headers['X-Samples-Resolution-Ms'] = f'{repository.last_samples_resolution_ms:.1f}'
+    response.headers['X-Samples-Fallback-Used'] = str(repository.last_samples_fallback_used).lower()
     return payload
 
 
@@ -335,6 +339,8 @@ def get_dashboard_full(
                 'cache_status': repository.last_dashboard_cache_status,
                 'kp_cache_status': repository.last_kp_cache_status,
                 'samples_source': repository.last_samples_source,
+                'samples_resolution_ms': round(repository.last_samples_resolution_ms, 1),
+                'samples_fallback_used': repository.last_samples_fallback_used,
                 'alerts_cache_status': repository.last_alerts_cache_status,
             }
         ),
@@ -344,6 +350,8 @@ def get_dashboard_full(
     response.headers['X-Samples-Source'] = repository.last_samples_source
     response.headers['X-Samples-Missing-Tags'] = str(repository.last_samples_missing_tags)
     response.headers['X-Samples-Missing-Ratio'] = f'{repository.last_samples_missing_ratio:.3f}'
+    response.headers['X-Samples-Resolution-Ms'] = f'{repository.last_samples_resolution_ms:.1f}'
+    response.headers['X-Samples-Fallback-Used'] = str(repository.last_samples_fallback_used).lower()
     response.headers['X-Alerts-Cache-Status'] = repository.last_alerts_cache_status
     response.headers['X-Alerts-Source'] = repository.last_alerts_source
     response.headers['X-Alerts-Text-Repairs'] = str(repository.last_alerts_text_repairs)
