@@ -10,6 +10,7 @@ class LayoutSummaryChips extends StatelessWidget {
     required this.layoutLabel,
     this.onTapDensity,
     this.onTapLayout,
+    this.onTapReset,
   });
 
   final int tileCount;
@@ -17,6 +18,7 @@ class LayoutSummaryChips extends StatelessWidget {
   final String layoutLabel;
   final VoidCallback? onTapDensity;
   final VoidCallback? onTapLayout;
+  final VoidCallback? onTapReset;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +39,13 @@ class LayoutSummaryChips extends StatelessWidget {
           onTap: onTapLayout,
           semanticLabel: 'Cambiar vista actual: $layoutLabel',
         ),
+        if (onTapReset != null)
+          _ChipLabel(
+            text: 'Restablecer',
+            icon: Icons.restart_alt_rounded,
+            onTap: onTapReset,
+            semanticLabel: 'Restablecer ajustes de layout',
+          ),
       ],
     );
   }
