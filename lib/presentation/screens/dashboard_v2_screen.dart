@@ -120,7 +120,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                   layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                   onTapDensity: () => _openLayoutControls(),
                   onTapLayout: () => _openLayoutControls(),
-                  onTapReset: () => _confirmAndResetLayout(),
+                  onTapReset: _densityMode == _DensityMode.comfortable &&
+                          _tileLayoutMode == _TileLayoutMode.grid
+                      ? null
+                      : () => _confirmAndResetLayout(),
                 ),
               ),
             ),
@@ -197,7 +200,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                         layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
                         onTapDensity: () => _openLayoutControls(),
                         onTapLayout: () => _openLayoutControls(),
-                        onTapReset: () => _confirmAndResetLayout(),
+                        onTapReset: _densityMode == _DensityMode.comfortable &&
+                                _tileLayoutMode == _TileLayoutMode.grid
+                            ? null
+                            : () => _confirmAndResetLayout(),
                       ),
                     ),
                   ),
@@ -386,6 +392,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
     if (confirmed == true) {
       await _resetLayoutPreferences();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Layout restablecido a valores predeterminados'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
       if (closeControlsSheet && context.mounted) {
         Navigator.of(context).pop();
       }

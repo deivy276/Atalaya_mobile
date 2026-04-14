@@ -39,13 +39,12 @@ class LayoutSummaryChips extends StatelessWidget {
           onTap: onTapLayout,
           semanticLabel: 'Cambiar vista actual: $layoutLabel',
         ),
-        if (onTapReset != null)
-          _ChipLabel(
-            text: 'Restablecer',
-            icon: Icons.restart_alt_rounded,
-            onTap: onTapReset,
-            semanticLabel: 'Restablecer ajustes de layout',
-          ),
+        _ChipLabel(
+          text: 'Restablecer',
+          icon: Icons.restart_alt_rounded,
+          onTap: onTapReset,
+          semanticLabel: 'Restablecer ajustes de layout',
+        ),
       ],
     );
   }
@@ -70,7 +69,7 @@ class _ChipLabel extends StatelessWidget {
       button: onTap != null,
       label: semanticLabel ?? text,
       child: Tooltip(
-        message: text,
+        message: onTap == null ? '$text (sin cambios pendientes)' : text,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -79,7 +78,9 @@ class _ChipLabel extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: LayoutTokens.surfaceCard,
+                color: onTap == null
+                    ? LayoutTokens.surfaceCard.withValues(alpha: 0.6)
+                    : LayoutTokens.surfaceCard,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: LayoutTokens.dividerSubtle),
               ),
@@ -87,13 +88,21 @@ class _ChipLabel extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (icon != null) ...<Widget>[
-                    Icon(icon, size: 14, color: LayoutTokens.textSecondary),
+                    Icon(
+                      icon,
+                      size: 14,
+                      color: onTap == null
+                          ? LayoutTokens.textMuted
+                          : LayoutTokens.textSecondary,
+                    ),
                     const SizedBox(width: 6),
                   ],
                   Text(
                     text,
-                    style: const TextStyle(
-                      color: LayoutTokens.textSecondary,
+                    style: TextStyle(
+                      color: onTap == null
+                          ? LayoutTokens.textMuted
+                          : LayoutTokens.textSecondary,
                       fontSize: 12,
                     ),
                   ),
