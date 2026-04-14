@@ -87,6 +87,12 @@ app.add_middleware(
 @app.on_event('startup')
 def startup_init_auth() -> None:
     validate_auth_runtime_security()
+    if settings.db_connection_budget > 0 and settings.estimated_db_connection_peak > settings.db_connection_budget:
+        print(
+            '[db] WARNING estimated connection peak exceeds configured budget: '
+            f"peak={settings.estimated_db_connection_peak}, budget={settings.db_connection_budget}. "
+            'Tune APP_WORKERS / POOL_SIZE / MAX_OVERFLOW.'
+        )
     if settings.auth_skip_db_init:
         print('[auth] AUTH_SKIP_DB_INIT=true, skipping auth schema bootstrap')
         return

@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     idle_in_transaction_session_timeout_ms: int = Field(default=15000, alias='IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS')
     db_retry_attempts: int = Field(default=2, alias='DB_RETRY_ATTEMPTS')
     db_retry_backoff_ms: int = Field(default=120, alias='DB_RETRY_BACKOFF_MS')
+    app_workers: int = Field(default=1, alias='APP_WORKERS')
+    db_connection_budget: int = Field(default=0, alias='DB_CONNECTION_BUDGET')
 
     dashboard_alert_limit: int = Field(default=25, alias='DASHBOARD_ALERT_LIMIT')
     stale_threshold_seconds: int = Field(default=10, alias='STALE_THRESHOLD_SECONDS')
@@ -162,6 +164,11 @@ class Settings(BaseSettings):
             f'{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}'
             f'?sslmode={self.db_sslmode}'
         )
+
+    @property
+    def estimated_db_connection_peak(self) -> int:
+        workers = max(1, int(self.app_workers))
+        return workers * (max(1, int(self.pool_size)) + max(0, int(self.max_overflow)))
 
 
 @lru_cache(maxsize=1)

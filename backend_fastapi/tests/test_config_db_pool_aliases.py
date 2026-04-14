@@ -34,6 +34,13 @@ class ConfigDbPoolAliasesTests(unittest.TestCase):
         self.assertEqual(settings.pool_timeout_seconds, 12)
         self.assertEqual(settings.pool_recycle_seconds, 120)
 
+    def test_estimated_connection_peak_uses_workers_and_pool(self) -> None:
+        os.environ['APP_WORKERS'] = '3'
+        os.environ['POOL_SIZE'] = '4'
+        os.environ['MAX_OVERFLOW'] = '2'
+        settings = Settings()
+        self.assertEqual(settings.estimated_db_connection_peak, 18)
+
 
 if __name__ == '__main__':
     unittest.main()
