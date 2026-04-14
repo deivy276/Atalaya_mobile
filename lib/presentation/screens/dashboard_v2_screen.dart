@@ -26,6 +26,8 @@ class DashboardV2Screen extends ConsumerStatefulWidget {
 
 class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   String? _selectedVariableTag;
+  _DensityMode _densityMode = _DensityMode.comfortable;
+  _TileLayoutMode _tileLayoutMode = _TileLayoutMode.grid;
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +81,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     String job,
     Map<String, String> unitPrefs,
   ) {
+    final selectedTile = _findSelectedTile(uiModel);
+
     return Stack(
       children: <Widget>[
         CustomScrollView(
@@ -89,9 +93,22 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                 title: uiModel.appTitle,
                 status: uiModel.wellStatus,
                 selectedVariableId: uiModel.selectedVariableId,
+                densityMode: _densityMode,
+                onDensityChanged: (mode) => setState(() => _densityMode = mode),
+                layoutMode: _tileLayoutMode,
+                onLayoutChanged: (mode) => setState(() => _tileLayoutMode = mode),
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            if (selectedTile != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _SelectedVariableBanner(
+                    tile: selectedTile,
+                  ),
+                ),
+              ),
             SliverToBoxAdapter(
               child: WellOverviewCard(
                 well: uiModel.activeWell,
@@ -124,6 +141,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     String job,
     Map<String, String> unitPrefs,
   ) {
+    final selectedTile = _findSelectedTile(uiModel);
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1480),
@@ -138,9 +157,22 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       title: uiModel.appTitle,
                       status: uiModel.wellStatus,
                       selectedVariableId: uiModel.selectedVariableId,
+                      densityMode: _densityMode,
+                      onDensityChanged: (mode) => setState(() => _densityMode = mode),
+                      layoutMode: _tileLayoutMode,
+                      onLayoutChanged: (mode) => setState(() => _tileLayoutMode = mode),
                     ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  if (selectedTile != null)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _SelectedVariableBanner(
+                          tile: selectedTile,
+                        ),
+                      ),
+                    ),
                   SliverToBoxAdapter(
                     child: WellOverviewCard(
                       well: uiModel.activeWell,
@@ -170,41 +202,58 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
-  SliverGrid _buildTilesGrid(
+  Widget _buildTilesGrid(
     DashboardViewState viewState,
     DashboardUiModel uiModel,
     String well,
     String job,
     Map<String, String> unitPrefs,
   ) {
+    final itemBuilder = (BuildContext context, int index) {
+      final model = uiModel.tiles[index];
+      final variable = viewState.payload.variables.firstWhere((item) => item.tag == model.id);
+      return KpiTileV2(
+        label: model.label,
+        value: model.valueText,
+        unit: model.unitText,
+        delta: model.deltaText,
+        sparkline: model.trendSeries,
+        selected: model.isSelected,
+        accentColor: model.accentColor,
+        onTap: () {
+          setState(() => _selectedVariableTag = model.id);
+          _openVariableDetail(context, variable, well, job, unitPrefs);
+        },
+      );
+    };
+
+    if (_tileLayoutMode == _TileLayoutMode.list) {
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => Padding(
+            padding: EdgeInsets.only(bottom: index == uiModel.tiles.length - 1 ? 0 : 12),
+            child: SizedBox(
+              height: 170,
+              child: itemBuilder(context, index),
+            ),
+          ),
+          childCount: uiModel.tiles.length,
+        ),
+      );
+    }
+
     final crossAxisCount = _resolveCrossAxisCount(MediaQuery.of(context).size.width);
 
     return SliverGrid(
       delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final model = uiModel.tiles[index];
-          final variable = viewState.payload.variables.firstWhere((item) => item.tag == model.id);
-          return KpiTileV2(
-            label: model.label,
-            value: model.valueText,
-            unit: model.unitText,
-            delta: model.deltaText,
-            sparkline: model.trendSeries,
-            selected: model.isSelected,
-            accentColor: model.accentColor,
-            onTap: () {
-              setState(() => _selectedVariableTag = model.id);
-              _openVariableDetail(context, variable, well, job, unitPrefs);
-            },
-          );
-        },
+        itemBuilder,
         childCount: uiModel.tiles.length,
       ),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1.18,
+        childAspectRatio: _densityMode == _DensityMode.compact ? 1.28 : 1.12,
       ),
     );
   }
@@ -213,6 +262,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     if (width >= 1400) return 4;
     if (width >= 900) return 3;
     return 2;
+  }
+
+  VariableTileUiModel? _findSelectedTile(DashboardUiModel uiModel) {
+    if (_selectedVariableTag == null) return null;
+    for (final tile in uiModel.tiles) {
+      if (tile.id == _selectedVariableTag) return tile;
+    }
+    return null;
   }
 
   DashboardUiModel _buildUiModel(
@@ -467,11 +524,19 @@ class _DashboardHeading extends StatelessWidget {
     required this.title,
     required this.status,
     required this.selectedVariableId,
+    required this.densityMode,
+    required this.onDensityChanged,
+    required this.layoutMode,
+    required this.onLayoutChanged,
   });
 
   final String title;
   final String status;
   final String? selectedVariableId;
+  final _DensityMode densityMode;
+  final ValueChanged<_DensityMode> onDensityChanged;
+  final _TileLayoutMode layoutMode;
+  final ValueChanged<_TileLayoutMode> onLayoutChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -513,10 +578,101 @@ class _DashboardHeading extends StatelessWidget {
               ),
             ),
           ),
+        const SizedBox(width: 8),
+        SegmentedButton<_DensityMode>(
+          style: ButtonStyle(
+            foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+            backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
+          ),
+          showSelectedIcon: false,
+          segments: const <ButtonSegment<_DensityMode>>[
+            ButtonSegment<_DensityMode>(
+              value: _DensityMode.compact,
+              label: Text('Compacto'),
+            ),
+            ButtonSegment<_DensityMode>(
+              value: _DensityMode.comfortable,
+              label: Text('Cómodo'),
+            ),
+          ],
+          selected: <_DensityMode>{densityMode},
+          onSelectionChanged: (selection) {
+            if (selection.isNotEmpty) {
+              onDensityChanged(selection.first);
+            }
+          },
+        ),
+        const SizedBox(width: 8),
+        SegmentedButton<_TileLayoutMode>(
+          style: ButtonStyle(
+            foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+            backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
+          ),
+          showSelectedIcon: false,
+          segments: const <ButtonSegment<_TileLayoutMode>>[
+            ButtonSegment<_TileLayoutMode>(
+              value: _TileLayoutMode.grid,
+              icon: Icon(Icons.grid_view_rounded, size: 18),
+            ),
+            ButtonSegment<_TileLayoutMode>(
+              value: _TileLayoutMode.list,
+              icon: Icon(Icons.view_agenda_rounded, size: 18),
+            ),
+          ],
+          selected: <_TileLayoutMode>{layoutMode},
+          onSelectionChanged: (selection) {
+            if (selection.isNotEmpty) {
+              onLayoutChanged(selection.first);
+            }
+          },
+        ),
       ],
     );
   }
 }
+
+class _SelectedVariableBanner extends StatelessWidget {
+  const _SelectedVariableBanner({required this.tile});
+
+  final VariableTileUiModel tile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: LayoutTokens.surfaceCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: LayoutTokens.dividerSubtle),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.analytics_rounded, color: LayoutTokens.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${tile.label}: ${tile.valueText} ${tile.unitText}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: LayoutTokens.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            tile.deltaText,
+            style: TextStyle(color: tile.accentColor, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _DensityMode { compact, comfortable }
+
+enum _TileLayoutMode { grid, list }
 
 class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.series});
