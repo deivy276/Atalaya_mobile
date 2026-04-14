@@ -50,6 +50,7 @@ Headers de observabilidad en `/api/v1/dashboard` y `/api/v1/dashboard/full`:
   - `python checks/check_v4_kpi_query_paths_benchmark.py --tags spp,rpm,wob`
 - Nota: los scripts de `checks/` ahora fallan de forma controlada con mensaje claro si faltan `DB_*` en el entorno (exit code 2).
 - Cobertura automatizada: `backend_fastapi/tests/test_phase_c_checks_scripts.py` valida este comportamiento de falla controlada.
+- Cobertura de headers KPI: `backend_fastapi/tests/test_dashboard_observability_headers.py` valida `X-Samples-*` en `/dashboard` y `/dashboard/full`.
 
 ## Avance Fase C
 
