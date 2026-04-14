@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from time import sleep
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -78,7 +78,7 @@ def get_db() -> Generator[Session, None, None]:
     for attempt in range(attempts):
         candidate = session_factory()
         try:
-            candidate.execute(text('SELECT 1'))
+            candidate.connection()
             db = candidate
             break
         except OperationalError as exc:
