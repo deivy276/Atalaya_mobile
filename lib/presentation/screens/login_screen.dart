@@ -88,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       final fallbackTtlHours = 12;
       final token = 'sid:${username}:${DateTime.now().millisecondsSinceEpoch}';
-      final expiresAt = DateTime.now().toUtc().add(const Duration(hours: fallbackTtlHours));
+      final expiresAt = DateTime.now().toUtc().add(Duration(hours: fallbackTtlHours));
 
       if (response.statusCode == 200) {
         await widget.onLoginSuccess(token: token, expiresAt: expiresAt);
