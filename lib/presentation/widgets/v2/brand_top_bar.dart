@@ -19,7 +19,11 @@ class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: LayoutTokens.spacing16,
       title: const Row(
         children: <Widget>[
-          Icon(Icons.change_history_rounded, color: LayoutTokens.textPrimary),
+          Image(
+            image: AssetImage('assets/Atalaya.png'),
+            height: 24,
+            fit: BoxFit.contain,
+          ),
           SizedBox(width: LayoutTokens.spacing8),
           Text(
             'Atalaya Mobile',
