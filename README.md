@@ -24,6 +24,18 @@ Para evitar fricción durante mejoras visuales, puedes correr la app en modo moc
 
 Este script ejecuta `flutter pub get` y levanta `flutter run -d chrome --dart-define=ATALAYA_USE_MOCK=true`.
 
+### Feature flag de layout v2
+
+- Nuevo layout principal activable con:
+  - `--dart-define=MOBILE_DASHBOARD_V2=true` (default actual)
+  - `--dart-define=MOBILE_DASHBOARD_V2=false` para volver al layout clásico.
+
+## Seguridad móvil (Fase 4)
+
+- Evitar almacenamiento en texto plano de tokens/sesiones.
+- Usar almacenamiento seguro por plataforma (Keychain/Keystore) mediante `flutter_secure_storage`.
+- Implementación base: `lib/core/security/session_secure_storage.dart`.
+
 ## Pruebas locales (estructura y smoke)
 
 Antes de ejecutar pruebas, actualiza/crea la estructura local de carpetas:
