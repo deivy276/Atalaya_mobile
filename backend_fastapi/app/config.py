@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     db_max_overflow: int = Field(default=10, alias='DB_MAX_OVERFLOW')
     db_pool_timeout_seconds: int = Field(default=30, alias='DB_POOL_TIMEOUT_SECONDS')
     db_pool_recycle_seconds: int = Field(default=300, alias='DB_POOL_RECYCLE_SECONDS')
+    statement_timeout_ms: int = Field(default=5000, alias='STATEMENT_TIMEOUT_MS')
+    idle_in_transaction_session_timeout_ms: int = Field(
+        default=15000,
+        alias='IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS',
+    )
+    db_retry_attempts: int = Field(default=2, alias='DB_RETRY_ATTEMPTS')
+    db_retry_backoff_ms: int = Field(default=120, alias='DB_RETRY_BACKOFF_MS')
+    app_workers: int = Field(default=1, alias='APP_WORKERS')
 
     dashboard_alert_limit: int = Field(default=25, alias='DASHBOARD_ALERT_LIMIT')
     stale_threshold_seconds: int = Field(default=10, alias='STALE_THRESHOLD_SECONDS')
@@ -152,7 +160,7 @@ class Settings(BaseSettings):
     @property
     def estimated_db_connection_peak(self) -> int:
         workers = max(1, int(self.app_workers))
-        return workers * (max(1, int(self.pool_size)) + max(0, int(self.max_overflow)))
+        return workers * (self.db_pool_size + self.db_max_overflow)
 
 
 @lru_cache(maxsize=1)
