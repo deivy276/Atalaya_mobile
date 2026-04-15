@@ -28,7 +28,9 @@ final selectedTrendRangeProvider =
 final editLayoutModeProvider = StateProvider<bool>((ref) => false);
 
 class DashboardScreen extends ConsumerStatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.onLogout});
+
+  final VoidCallback? onLogout;
 
   @override
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
@@ -68,6 +70,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   )
                 : const Icon(Icons.refresh_rounded),
           ),
+          if (widget.onLogout != null)
+            IconButton(
+              tooltip: 'Cerrar sesión',
+              onPressed: widget.onLogout,
+              icon: const Icon(Icons.logout_rounded),
+            ),
           const SizedBox(width: 8),
         ],
       ),
