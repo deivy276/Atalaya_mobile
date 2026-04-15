@@ -28,10 +28,10 @@ def _ensure_session_factory():
     _engine = create_engine(
         settings.sqlalchemy_database_url,
         pool_pre_ping=True,
-        pool_recycle=300,
-        pool_size=5,
-        max_overflow=10,
-        pool_timeout=30,
+        pool_recycle=settings.db_pool_recycle_seconds,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout_seconds,
         future=True,
     )
     _session_factory = sessionmaker(
