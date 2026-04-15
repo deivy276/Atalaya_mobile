@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/config/feature_flags.dart';
 import 'core/theme/pro_palette.dart';
 import 'presentation/screens/auth_gate_screen.dart';
 
