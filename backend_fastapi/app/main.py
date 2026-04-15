@@ -1,3 +1,4 @@
+import logging
 from time import perf_counter
 from time import sleep
 import traceback
@@ -73,6 +74,7 @@ from .schemas import (
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+logger = logging.getLogger(__name__)
 _rate_limit_lock = Lock()
 _rate_limit_buckets: dict[str, deque[float]] = defaultdict(deque)
 
