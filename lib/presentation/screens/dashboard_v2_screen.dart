@@ -21,7 +21,9 @@ import '../widgets/v2/predictor_alerts_dock.dart';
 import '../widgets/v2/well_overview_card.dart';
 
 class DashboardV2Screen extends ConsumerStatefulWidget {
-  const DashboardV2Screen({super.key});
+  const DashboardV2Screen({super.key, this.onLogout});
+
+  final VoidCallback? onLogout;
 
   @override
   ConsumerState<DashboardV2Screen> createState() => _DashboardV2ScreenState();
@@ -54,6 +56,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       appBar: BrandTopBar(
         onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
         onOpenMenu: _openLayoutControls,
+        onLogout: widget.onLogout,
       ),
       body: Container(
         decoration: const BoxDecoration(

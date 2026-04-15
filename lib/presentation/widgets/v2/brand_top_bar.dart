@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/layout_tokens.dart';
 
 class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const BrandTopBar({super.key, this.onRefresh, this.onOpenMenu});
+  const BrandTopBar({super.key, this.onRefresh, this.onOpenMenu, this.onLogout});
 
   final VoidCallback? onRefresh;
   final VoidCallback? onOpenMenu;
+  final VoidCallback? onLogout;
 
   @override
   Size get preferredSize => const Size.fromHeight(60);
@@ -40,6 +41,8 @@ class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
           IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded, color: LayoutTokens.textPrimary)),
         if (onOpenMenu != null)
           IconButton(onPressed: onOpenMenu, icon: const Icon(Icons.tune_rounded, color: LayoutTokens.textPrimary)),
+        if (onLogout != null)
+          IconButton(onPressed: onLogout, icon: const Icon(Icons.logout_rounded, color: LayoutTokens.textPrimary)),
       ],
     );
   }

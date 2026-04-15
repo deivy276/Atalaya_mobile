@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/feature_flags.dart';
 import 'core/theme/pro_palette.dart';
-import 'presentation/screens/dashboard_v2_screen.dart';
-import 'presentation/screens/dashboard_screen.dart';
+import 'presentation/screens/auth_gate_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +19,7 @@ class AtalayaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Atalaya Mobile',
       theme: ProPalette.themeData(),
-      home: FeatureFlags.mobileDashboardV2 ? const DashboardV2Screen() : const DashboardScreen(),
+      home: const AuthGateScreen(),
     );
   }
 }
