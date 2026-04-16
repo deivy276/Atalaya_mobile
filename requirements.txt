@@ -1,0 +1,5 @@
+flet==0.80.2
+flet-charts==0.80.2
+pg8000
+matplotlib
+

@@ -1,0 +1,67 @@
+[16:40:11] === Atalaya Run Helper v3 ===
+[16:40:11] Log file: C:\Users\DeivyRafaelPatinoUga\anaconda3\Atalaya\Mobile\logs\run_v3_20260415_164011.txt
+[16:42:22] Reset ADB profundo...
+[16:42:22] CMD> & "C:\Users\DeivyRafaelPatinoUga\AppData\Local\Android\Sdk\platform-tools\adb.exe" kill-server
+[16:42:22] CMD> Remove-Item "C:\Users\DeivyRafaelPatinoUga\.android\adbkey*" -Force -ErrorAction SilentlyContinue
+[16:42:22] CMD> & "C:\Users\DeivyRafaelPatinoUga\AppData\Local\Android\Sdk\platform-tools\adb.exe" start-server
+[16:42:27] CMD> & "C:\Users\DeivyRafaelPatinoUga\AppData\Local\Android\Sdk\platform-tools\adb.exe" devices
+List of devices attached
+R5CY12BRYRM	device
+[16:42:27] ✅ Reset ADB realizado. Revisa si aparece popup RSA en teléfono.
+[16:42:45] Pre-check rutas...
+[16:42:45] ✅ Rutas OK
+[16:42:45] Liberando puerto 8010 si está ocupado...
+[16:42:45] ✅ Puerto 8010 listo.
+[16:42:45] Levantando backend en nueva ventana...
+[16:42:45] ✅ Backend lanzado.
+[16:42:49] Health -> http://127.0.0.1:8010/health
+[16:42:51] ❌ http://127.0.0.1:8010/health error: No es posible conectar con el servidor remoto
+[16:42:51] Health -> http://192.168.159.36:8010/health
+[16:42:53] ❌ http://192.168.159.36:8010/health error: No es posible conectar con el servidor remoto
+[16:42:53] Health -> http://192.168.159.36:8010/health/db
+HEALTH_RESP http://192.168.159.36:8010/health/db: {"status":"ok"}
+[16:42:55] ✅ http://192.168.159.36:8010/health/db = ok
+[16:42:55] ❌ Health checks fallaron.
+[16:42:55] 
+=== RESUMEN ===
+[16:42:55] ⚠️ Paths: PENDING
+[16:42:55] ⚠️ Port: PENDING
+[16:42:55] ⚠️ BackendSpawn: PENDING
+[16:42:55] ⚠️ HealthLocal: PENDING
+[16:42:55] ⚠️ HealthLan: PENDING
+[16:42:55] ⚠️ HealthDb: PENDING
+[16:42:55] ⚠️ AdbPresent: PENDING
+[16:42:55] ⚠️ AdbDevice: PENDING
+[16:42:55] ⚠️ FlutterClean: SKIPPED
+[16:42:55] ⚠️ FlutterPubGet: PENDING
+[16:42:55] ⚠️ FlutterRun: PENDING
+[16:42:55] Log: C:\Users\DeivyRafaelPatinoUga\anaconda3\Atalaya\Mobile\logs\run_v3_20260415_164011.txt
+[16:49:25] Pre-check rutas...
+[16:49:25] ✅ Rutas OK
+[16:49:25] Liberando puerto 8010 si está ocupado...
+[16:49:26] ✅ Puerto 8010 listo.
+[16:49:26] Levantando backend en nueva ventana...
+[16:49:26] ✅ Backend lanzado.
+[16:49:30] Health -> http://127.0.0.1:8010/health
+HEALTH_RESP http://127.0.0.1:8010/health: {"status":"ok"}
+[16:49:31] ✅ http://127.0.0.1:8010/health = ok
+[16:49:31] Health -> http://192.168.159.36:8010/health
+HEALTH_RESP http://192.168.159.36:8010/health: {"status":"ok"}
+[16:49:31] ✅ http://192.168.159.36:8010/health = ok
+[16:49:31] Health -> http://192.168.159.36:8010/health/db
+HEALTH_RESP http://192.168.159.36:8010/health/db: {"status":"ok"}
+[16:49:31] ✅ http://192.168.159.36:8010/health/db = ok
+[16:49:31] 
+=== RESUMEN ===
+[16:49:31] ⚠️ Paths: PENDING
+[16:49:31] ⚠️ Port: PENDING
+[16:49:31] ⚠️ BackendSpawn: PENDING
+[16:49:32] ⚠️ HealthLocal: PENDING
+[16:49:32] ⚠️ HealthLan: PENDING
+[16:49:32] ⚠️ HealthDb: PENDING
+[16:49:32] ⚠️ AdbPresent: PENDING
+[16:49:32] ⚠️ AdbDevice: PENDING
+[16:49:32] ⚠️ FlutterClean: SKIPPED
+[16:49:32] ⚠️ FlutterPubGet: PENDING
+[16:49:32] ⚠️ FlutterRun: PENDING
+[16:49:32] Log: C:\Users\DeivyRafaelPatinoUga\anaconda3\Atalaya\Mobile\logs\run_v3_20260415_164011.txt
