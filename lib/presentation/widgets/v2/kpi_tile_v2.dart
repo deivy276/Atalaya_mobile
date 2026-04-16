@@ -132,7 +132,7 @@ class KpiTileV2 extends StatelessWidget {
                       ),
                     ),
             ),
-            const SizedBox(height: LayoutTokens.spacing6),
+            const SizedBox(height: LayoutTokens.spacing8),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: <Widget>[
