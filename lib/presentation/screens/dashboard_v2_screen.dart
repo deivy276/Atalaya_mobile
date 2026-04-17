@@ -221,7 +221,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       );
     }
 
-    final itemBuilder = (BuildContext context, int index) {
+    Widget itemBuilder(BuildContext context, int index) {
       final model = uiModel.tiles[index];
       final variable = viewState.payload.variables.firstWhere(
         (WellVariable item) => item.tag == model.id,
@@ -240,7 +240,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
           _openVariableDetail(variable);
         },
       );
-    };
+    }
 
     if (_tileLayoutMode == _TileLayoutMode.list) {
       return SliverList(
@@ -361,15 +361,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     if (confirmed == true) {
       await _resetLayoutPreferences();
       await HapticFeedback.lightImpact();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Layout restablecido a valores predeterminados'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      if (closeControlsSheet && context.mounted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Layout restablecido a valores predeterminados'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      if (closeControlsSheet) {
         Navigator.of(context).pop();
       }
     }
@@ -457,7 +456,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     return TileVisualStatus.normal;
   }
 
-
   Future<void> _openAlertDetail(AtalayaAlert alert) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -494,7 +492,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: severityColor.withOpacity(0.16),
+                      color: severityColor.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(color: severityColor),
                     ),
@@ -587,8 +585,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     const SizedBox(height: 8),
                     SegmentedButton<_DensityMode>(
                       style: ButtonStyle(
-                        foregroundColor: MaterialStateProperty.all(LayoutTokens.textSecondary),
-                        backgroundColor: MaterialStateProperty.all(LayoutTokens.surfaceCard),
+                        foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+                        backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
                       ),
                       showSelectedIcon: false,
                       segments: const <ButtonSegment<_DensityMode>>[
@@ -617,8 +615,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     const SizedBox(height: 8),
                     SegmentedButton<_TileLayoutMode>(
                       style: ButtonStyle(
-                        foregroundColor: MaterialStateProperty.all(LayoutTokens.textSecondary),
-                        backgroundColor: MaterialStateProperty.all(LayoutTokens.surfaceCard),
+                        foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
+                        backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
                       ),
                       showSelectedIcon: false,
                       segments: const <ButtonSegment<_TileLayoutMode>>[
@@ -684,7 +682,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       },
     );
   }
-
 
   Future<void> _openVariableDetail(WellVariable variable) async {
     await showModalBottomSheet<void>(
