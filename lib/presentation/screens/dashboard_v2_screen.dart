@@ -4,17 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/constants/trend_range.dart';
 import '../../core/theme/layout_tokens.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/alert.dart';
 import '../../data/models/well_variable.dart';
 import '../models/dashboard_ui_model.dart';
 import '../providers/dashboard_controller.dart';
-import '../providers/trend_controller.dart';
 import '../providers/unit_preferences_controller.dart';
 import 'predictor_charts_screen.dart';
-import '../widgets/trend_chart_widget.dart';
 import '../widgets/v2/brand_top_bar.dart';
 import '../widgets/v2/kpi_tile_v2.dart';
 import '../widgets/v2/layout_summary_chips.dart';
@@ -114,8 +111,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                 onDensityChanged: _setDensityMode,
                 layoutMode: _tileLayoutMode,
                 onLayoutChanged: _setTileLayoutMode,
-                onOpenControls: () => _openLayoutControls(),
-                onOpenPredictorCharts: _openPredictorCharts,
               ),
             ]),
           ),
@@ -199,8 +194,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                           onDensityChanged: _setDensityMode,
                           layoutMode: _tileLayoutMode,
                           onLayoutChanged: _setTileLayoutMode,
-                          onOpenControls: () => _openLayoutControls(),
-                          onOpenPredictorCharts: _openPredictorCharts,
                         ),
                       ]),
                     ),
@@ -748,8 +741,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     String job,
     Map<String, String> unitPreferences,
   ) async {
-    TrendRange selected = TrendRange.h2;
-
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -758,84 +749,26 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final displayUnit = UnitConverter.resolveDisplayUnit(
-              slotIndex: variable.slot - 1,
-              tag: variable.tag,
-              rawUnit: variable.rawUnit,
-              well: well,
-              job: job,
-              preferences: unitPreferences,
-            );
-            final trendAsync = ref.watch(trendSeriesProvider(TrendRequest(
-              tag: variable.tag,
-              rawUnit: variable.rawUnit,
-              displayUnit: displayUnit,
-              range: selected,
-            )));
-
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 22),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Center(
-                    child: Container(
-                      width: 48,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: LayoutTokens.textMuted,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    variable.label,
-                    style: const TextStyle(
-                      color: LayoutTokens.textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    'Updated ${DateFormat('HH:mm').format(DateTime.now())}',
-                    style: const TextStyle(color: LayoutTokens.textSecondary),
-                  ),
-                  const SizedBox(height: 12),
-                  TrendRangeSelector(
-                    selected: selected,
-                    onChanged: (range) => setModalState(() => selected = range),
-                  ),
-                  const SizedBox(height: 10),
-                  trendAsync.when(
-                    loading: () => const SizedBox(height: 280, child: Center(child: CircularProgressIndicator())),
-                    error: (error, _) => SizedBox(
-                      height: 180,
-                      child: Center(
-                        child: Text(
-                          '$error',
-                          style: const TextStyle(color: LayoutTokens.textSecondary),
-                        ),
-                      ),
-                    ),
-                    data: (series) => Column(
-                      children: <Widget>[
-                        TrendChartWidget(series: series),
-                        const SizedBox(height: 10),
-                        _StatsRow(series: series),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+        final _ = well;
+        final __ = job;
+        final ___ = unitPreferences;
+        return FractionallySizedBox(
+          heightFactor: 0.92,
+          child: PredictorChartsPanel(
+            embedded: true,
+            initialType: _predictorTypeForVariable(variable.tag),
+          ),
         );
       },
     );
+  }
+
+  PredictorChartType _predictorTypeForVariable(String tag) {
+    final normalized = tag.toLowerCase();
+    if (normalized.contains('hook_load')) return PredictorChartType.hookLoad;
+    if (normalized.contains('torque')) return PredictorChartType.surfaceTorque;
+    if (normalized.contains('pump_pressure')) return PredictorChartType.pumpPressure;
+    return PredictorChartType.hookLoad;
   }
 }
 
@@ -848,8 +781,6 @@ class _DashboardHeading extends StatelessWidget {
     required this.onDensityChanged,
     required this.layoutMode,
     required this.onLayoutChanged,
-    required this.onOpenControls,
-    required this.onOpenPredictorCharts,
   });
 
   final String title;
@@ -859,8 +790,6 @@ class _DashboardHeading extends StatelessWidget {
   final ValueChanged<_DensityMode> onDensityChanged;
   final _TileLayoutMode layoutMode;
   final ValueChanged<_TileLayoutMode> onLayoutChanged;
-  final VoidCallback onOpenControls;
-  final VoidCallback onOpenPredictorCharts;
 
   @override
   Widget build(BuildContext context) {
@@ -921,7 +850,7 @@ class _DashboardHeading extends StatelessWidget {
                   ),
                 ),
                 if (!showInlineControls)
-                  _CompactControlsHint(onTap: onOpenControls)
+                  const SizedBox.shrink()
                 else ...<Widget>[
                   SegmentedButton<_DensityMode>(
                     style: ButtonStyle(
@@ -975,45 +904,6 @@ class _DashboardHeading extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _CompactControlsHint extends StatelessWidget {
-  const _CompactControlsHint({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: LayoutTokens.surfaceCard,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: LayoutTokens.dividerSubtle),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(Icons.tune_rounded, size: 14, color: LayoutTokens.textSecondary),
-              SizedBox(width: 6),
-              Text(
-                'Más opciones en menú',
-                style: TextStyle(
-                  color: LayoutTokens.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1128,44 +1018,3 @@ class _EmptyKpiState extends StatelessWidget {
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }
-
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.series});
-
-  final TrendSeriesState series;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = <String, String>{
-      'Min': UnitConverter.formatNumber(series.yMin),
-      'Avg': UnitConverter.formatNumber(series.yAvgAll),
-      'Max': UnitConverter.formatNumber(series.yMax),
-      'N': '${series.points.length}',
-    };
-
-    return Row(
-      children: items.entries
-          .map(
-            (entry) => Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: LayoutTokens.surfaceCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: LayoutTokens.dividerSubtle),
-                ),
-                child: Column(
-                  children: <Widget>[
-                    Text(entry.key, style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 11)),
-                    const SizedBox(height: 2),
-                    Text(entry.value, style: const TextStyle(color: LayoutTokens.textPrimary, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
