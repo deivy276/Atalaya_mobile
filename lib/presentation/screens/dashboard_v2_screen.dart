@@ -368,6 +368,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     await prefs.setString(_layoutPrefKey, mode.name);
   }
 
+  Future<void> _openPredictorCharts() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PredictorChartsScreen(),
+      ),
+    );
+  }
+
   Future<void> _resetLayoutPreferences() async {
     setState(() {
       _densityMode = _DensityMode.comfortable;
@@ -827,6 +835,20 @@ class _DashboardHeading extends StatelessWidget {
                       ),
                     ),
                   ),
+                OutlinedButton.icon(
+                  onPressed: onOpenPredictorCharts,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: LayoutTokens.textSecondary,
+                    side: const BorderSide(color: LayoutTokens.dividerSubtle),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  icon: const Icon(Icons.multiline_chart_rounded, size: 16),
+                  label: const Text(
+                    'Predictor Charts',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
                 if (!showInlineControls)
                   const SizedBox.shrink()
                 else ...<Widget>[
