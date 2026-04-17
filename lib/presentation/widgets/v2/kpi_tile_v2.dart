@@ -28,7 +28,12 @@ class KpiTileV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = accentColor ?? LayoutTokens.accentGreen;
-    final borderColor = selected ? LayoutTokens.accentOrange : color.withValues(alpha: 0.75);
+    final borderColor = selected ? LayoutTokens.accentOrange.withValues(alpha: 0.9) : Colors.white12;
+    final shadowColor = selected ? LayoutTokens.accentOrange : color;
+    final parsedDelta = _parseDeltaValue(delta);
+    final deltaIsPositive = parsedDelta >= 0;
+    final deltaArrowIcon = deltaIsPositive ? Icons.arrow_upward : Icons.arrow_downward;
+    final deltaColor = deltaIsPositive ? color : LayoutTokens.accentOrange;
 
     return InkWell(
       onTap: onTap,
@@ -36,27 +41,64 @@ class KpiTileV2 extends StatelessWidget {
       child: Ink(
         padding: const EdgeInsets.all(LayoutTokens.spacing12),
         decoration: BoxDecoration(
-          color: selected ? LayoutTokens.surfaceCardSelected : LayoutTokens.surfaceCard,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              const Color(0xFF112336),
+              selected ? const Color(0xFF0F2A44) : const Color(0xFF0B1C2D),
+            ],
+          ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderColor),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: shadowColor.withValues(alpha: selected ? 0.16 : 0.10),
+              blurRadius: selected ? 18 : 14,
+              spreadRadius: 0,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: LayoutTokens.textSecondary, fontSize: 13)),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFE8EEF7),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0.2,
+              ),
+            ),
             const SizedBox(height: LayoutTokens.spacing8),
             RichText(
               text: TextSpan(
                 text: value,
-                style: const TextStyle(color: LayoutTokens.textPrimary, fontSize: 32, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 42,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                ),
                 children: <InlineSpan>[
-                  TextSpan(text: ' $unit', style: const TextStyle(color: LayoutTokens.textSecondary, fontSize: 18, fontWeight: FontWeight.w500)),
+                  TextSpan(
+                    text: ' $unit',
+                    style: const TextStyle(
+                      color: Color(0xFFAFBAC7),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
                 ],
               ),
             ),
             const Spacer(),
             SizedBox(
-              height: 32,
+              height: 34,
               child: sparkline.length < 2
                   ? const SizedBox.shrink()
                   : LineChart(
@@ -71,22 +113,51 @@ class KpiTileV2 extends StatelessWidget {
                           LineChartBarData(
                             isCurved: true,
                             dotData: const FlDotData(show: false),
-                            barWidth: 1.6,
+                            barWidth: 2.0,
                             color: color,
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: <Color>[
+                                  color.withValues(alpha: 0.16),
+                                  color.withValues(alpha: 0.02),
+                                ],
+                              ),
+                            ),
                             spots: List<FlSpot>.generate(sparkline.length, (i) => FlSpot(i.toDouble(), sparkline[i])),
                           ),
                         ],
                       ),
                     ),
             ),
-            const SizedBox(height: LayoutTokens.spacing4),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(delta, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: LayoutTokens.spacing8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: <Widget>[
+                Icon(deltaArrowIcon, size: 14, color: deltaColor),
+                const SizedBox(width: 2),
+                Text(
+                  delta,
+                  style: TextStyle(
+                    color: deltaColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                    height: 0.9,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  double _parseDeltaValue(String raw) {
+    final normalized = raw.trim().replaceAll('%', '').replaceAll(',', '.');
+    return double.tryParse(normalized) ?? 0;
   }
 }
