@@ -1,4 +1,3 @@
-
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -33,16 +32,12 @@ class PredictorChartsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-<<<<<<< HEAD
         title: const Text('Predictor Charts'),
       ),
       body: PredictorChartsPanel(
         initialType: initialType,
         sourceLabel: sourceLabel,
         sourceTag: sourceTag,
-=======
-        title: Text('Predictor Charts'),
->>>>>>> 8f5527525c01c98e74f3a5ec6cbd76500699c615
       ),
     );
   }
@@ -145,9 +140,9 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              Text(
+              const Text(
                 'Vista de solo lectura con mock data.',
-                style: const TextStyle(color: LayoutTokens.textMuted),
+                style: TextStyle(color: LayoutTokens.textMuted),
               ),
               if (widget.sourceLabel != null || widget.sourceTag != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -197,9 +192,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                           : LayoutTokens.dividerSubtle,
                     ),
                     labelStyle: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : LayoutTokens.textSecondary,
+                      color: isSelected ? Colors.white : LayoutTokens.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                     onSelected: (_) => setState(() => _selected = type),
@@ -244,8 +237,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: true,
-                        horizontalInterval:
-                            (chartData.maxY - chartData.minY) / 6,
+                        horizontalInterval: (chartData.maxY - chartData.minY) / 6,
                         getDrawingHorizontalLine: (_) => const FlLine(
                           color: Color(0x334A6D96),
                           strokeWidth: 1,
@@ -343,8 +335,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                             .map(
                               (depth) => HorizontalLine(
                                 y: depth,
-                                color:
-                                    LayoutTokens.accentRed.withOpacity(0.60),
+                                color: LayoutTokens.accentRed.withOpacity(0.60),
                                 strokeWidth: 0.8,
                                 dashArray: const <int>[2, 3],
                               ),
@@ -417,9 +408,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
         final normalized = depth / maxY;
         final x = minX +
             (maxX - minX) * (0.05 + normalized * (0.85 + offset * 0.01)) +
-            math.sin((index + seed) * 0.6 + offset) *
-                (maxX - minX) *
-                0.015;
+            math.sin((index + seed) * 0.6 + offset) * (maxX - minX) * 0.015;
 
         return FlSpot(x.clamp(minX, maxX).toDouble(), depth);
       });
