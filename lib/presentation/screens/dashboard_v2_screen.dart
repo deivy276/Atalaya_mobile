@@ -14,7 +14,6 @@ import '../providers/unit_preferences_controller.dart';
 import 'predictor_charts_screen.dart';
 import '../widgets/v2/brand_top_bar.dart';
 import '../widgets/v2/kpi_tile_v2.dart';
-import '../widgets/v2/layout_summary_chips.dart';
 import '../widgets/v2/predictor_alerts_dock.dart';
 import '../widgets/v2/well_overview_card.dart';
 
@@ -53,7 +52,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       extendBody: true,
       appBar: BrandTopBar(
         onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
-        onOpenMenu: () => _openLayoutControls(),
+        onOpenMenu: _openLayoutControls,
         onLogout: widget.onLogout,
       ),
       body: Container(
@@ -136,7 +135,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
               child: CustomScrollView(
                 slivers: <Widget>[
                   _buildOverviewSliver(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
+                    padding: const EdgeInsets.fromLTRB(20, 14, 12, 0),
                     viewState: viewState,
                     uiModel: uiModel,
                     job: job,
@@ -175,31 +174,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       padding: padding,
       sliver: SliverList(
         delegate: SliverChildListDelegate.fixed(<Widget>[
-          _DashboardHeading(
-            title: uiModel.appTitle,
-            status: uiModel.wellStatus,
-            selectedVariableId: uiModel.selectedVariableId,
-          ),
-          const SizedBox(height: 12),
           WellOverviewCard(
             well: uiModel.activeWell,
             job: job,
             isActive: viewState.connectionStatus == ConnectionStatus.connected,
-          ),
-          const SizedBox(height: 12),
-          LayoutSummaryChips(
-            tileCount: uiModel.tiles.length,
-            statusText: viewState.connectionStatus == ConnectionStatus.connected
-                ? 'Estado: En línea'
-                : 'Estado: Desactualizado',
-            statusColor: viewState.connectionStatus == ConnectionStatus.connected
-                ? LayoutTokens.accentGreen
-                : LayoutTokens.accentOrange,
-            densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
-            layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
-            onTapDensity: () => _openLayoutControls(),
-            onTapLayout: () => _openLayoutControls(),
-            onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
           ),
           if (selectedTile != null) ...<Widget>[
             const SizedBox(height: 12),
@@ -221,10 +199,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       );
     }
 
-    Widget itemBuilder(BuildContext context, int index) {
+    Widget buildTileItem(BuildContext context, int index) {
       final model = uiModel.tiles[index];
       final variable = viewState.payload.variables.firstWhere(
-        (WellVariable item) => item.tag == model.id,
+        (item) => item.tag == model.id,
       );
 
       return KpiTileV2(
@@ -237,7 +215,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         accentColor: model.accentColor,
         onTap: () {
           setState(() => _selectedVariableTag = model.id);
-          _openVariableDetail(variable);
+          _openVariableDetail(context, variable);
         },
       );
     }
@@ -251,7 +229,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             ),
             child: SizedBox(
               height: 170,
-              child: itemBuilder(context, index),
+              child: buildTileItem(context, index),
             ),
           ),
           childCount: uiModel.tiles.length,
@@ -263,7 +241,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
     return SliverGrid(
       delegate: SliverChildBuilderDelegate(
-        itemBuilder,
+        buildTileItem,
         childCount: uiModel.tiles.length,
       ),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -284,7 +262,9 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   VariableTileUiModel? _findSelectedTile(DashboardUiModel uiModel) {
     if (_selectedVariableTag == null) return null;
     for (final tile in uiModel.tiles) {
-      if (tile.id == _selectedVariableTag) return tile;
+      if (tile.id == _selectedVariableTag) {
+        return tile;
+      }
     }
     return null;
   }
@@ -358,19 +338,22 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       },
     );
 
-    if (confirmed == true) {
-      await _resetLayoutPreferences();
-      await HapticFeedback.lightImpact();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Layout restablecido a valores predeterminados'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      if (closeControlsSheet) {
-        Navigator.of(context).pop();
-      }
+    if (confirmed != true) return;
+
+    await _resetLayoutPreferences();
+    await HapticFeedback.lightImpact();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Layout restablecido a valores predeterminados'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    if (closeControlsSheet) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -389,8 +372,9 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         preferences: unitPreferences,
       );
 
-      final converted =
-          variable.value == null ? null : UnitConverter.convertValue(variable.value!, variable.rawUnit, displayUnit);
+      final converted = variable.value == null
+          ? null
+          : UnitConverter.convertValue(variable.value!, variable.rawUnit, displayUnit);
       final sparkline = state.variableHistoryByTag[variable.tag] ?? const <double>[];
       final delta = sparkline.length >= 2
           ? ((sparkline.last - sparkline.first) / (sparkline.first == 0 ? 1 : sparkline.first)) * 100
@@ -683,105 +667,35 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
-  Future<void> _openVariableDetail(WellVariable variable) async {
+  Future<void> _openVariableDetail(
+    BuildContext context,
+    WellVariable variable,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (BuildContext _) {
+      backgroundColor: const Color(0xFF0A162A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
         return FractionallySizedBox(
-          heightFactor: 0.94,
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: PredictorChartsPanel(
-              embedded: true,
-              initialType: _predictorTypeForVariable(variable),
-              sourceLabel: variable.label,
-              sourceTag: variable.tag,
-            ),
+          heightFactor: 0.92,
+          child: PredictorChartsPanel(
+            embedded: true,
+            initialType: _predictorTypeForVariable(variable.tag),
           ),
         );
       },
     );
   }
 
-  PredictorChartType _predictorTypeForVariable(WellVariable variable) {
-    final signature = '${variable.tag} ${variable.label}'.toLowerCase();
-
-    if (signature.contains('torque')) {
-      return PredictorChartType.surfaceTorque;
-    }
-
-    if (signature.contains('pump') || signature.contains('pressure')) {
-      return PredictorChartType.pumpPressure;
-    }
-
-    if (signature.contains('hook') || signature.contains('load')) {
-      return PredictorChartType.hookLoad;
-    }
-
+  PredictorChartType _predictorTypeForVariable(String tag) {
+    final normalized = tag.toLowerCase();
+    if (normalized.contains('hook_load')) return PredictorChartType.hookLoad;
+    if (normalized.contains('torque')) return PredictorChartType.surfaceTorque;
+    if (normalized.contains('pump_pressure')) return PredictorChartType.pumpPressure;
     return PredictorChartType.hookLoad;
-  }
-}
-
-class _DashboardHeading extends StatelessWidget {
-  const _DashboardHeading({
-    required this.title,
-    required this.status,
-    required this.selectedVariableId,
-  });
-
-  final String title;
-  final String status;
-  final String? selectedVariableId;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          title,
-          style: const TextStyle(
-            color: LayoutTokens.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          status,
-          style: const TextStyle(color: LayoutTokens.textSecondary),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Toca una variable para abrir el predictor en modal.',
-          style: TextStyle(
-            color: LayoutTokens.textMuted,
-            fontSize: 12,
-          ),
-        ),
-        if (selectedVariableId != null) ...<Widget>[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: LayoutTokens.surfaceCard,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: LayoutTokens.dividerSubtle),
-            ),
-            child: Text(
-              'Tag: $selectedVariableId',
-              style: const TextStyle(
-                color: LayoutTokens.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
   }
 }
 
