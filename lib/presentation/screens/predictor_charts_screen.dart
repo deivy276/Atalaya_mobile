@@ -26,7 +26,7 @@ class _PredictorChartsScreenState extends State<PredictorChartsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppBar(
+      appBar: AppBar(
         title: Text('Predictor Charts'),
       ),
       body: const PredictorChartsPanel(),
