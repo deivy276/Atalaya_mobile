@@ -1,0 +1,40 @@
+[16:06:24] === Atalaya Run Helper v3 ===
+[16:06:24] Log file: C:\Users\DeivyRafaelPatinoUga\anaconda3\Atalaya\Mobile\logs\run_v3_20260415_160624.txt
+[16:08:19] Reset ADB profundo...
+[16:08:19] CMD> & "C:\Users\DeivyRafaelPatinoUga\AppData\Local\Android\Sdk\platform-tools\adb.exe" kill-server
+[16:08:21] CMD> Remove-Item "C:\Users\DeivyRafaelPatinoUga\.android\adbkey*" -Force -ErrorAction SilentlyContinue
+[16:08:21] CMD> & "C:\Users\DeivyRafaelPatinoUga\AppData\Local\Android\Sdk\platform-tools\adb.exe" start-server
+[16:08:27] CMD> & "C:\Users\DeivyRafaelPatinoUga\AppData\Local\Android\Sdk\platform-tools\adb.exe" devices
+List of devices attached
+R5CY12BRYRM	unauthorized
+[16:08:27] ✅ Reset ADB realizado. Revisa si aparece popup RSA en teléfono.
+[16:08:32] Pre-check rutas...
+[16:08:32] ✅ Rutas OK
+[16:08:32] Liberando puerto 8010 si está ocupado...
+[16:08:32] ✅ Puerto 8010 listo.
+[16:08:32] Levantando backend en nueva ventana...
+[16:08:32] ✅ Backend lanzado.
+[16:08:36] Health -> http://127.0.0.1:8010/health
+[16:08:38] ❌ http://127.0.0.1:8010/health error: No es posible conectar con el servidor remoto
+[16:08:38] Health -> http://192.168.159.36:8010/health
+HEALTH_RESP http://192.168.159.36:8010/health: {"status":"ok"}
+[16:08:41] ✅ http://192.168.159.36:8010/health = ok
+[16:08:41] Health -> http://192.168.159.36:8010/health/db
+HEALTH_RESP http://192.168.159.36:8010/health/db: {"status":"ok"}
+[16:08:41] ✅ http://192.168.159.36:8010/health/db = ok
+[16:08:41] ❌ Health checks fallaron.
+[16:08:41] 
+=== RESUMEN ===
+[16:08:41] ⚠️ Paths: PENDING
+[16:08:41] ⚠️ Port: PENDING
+[16:08:41] ⚠️ BackendSpawn: PENDING
+[16:08:41] ⚠️ HealthLocal: PENDING
+[16:08:41] ⚠️ HealthLan: PENDING
+[16:08:41] ⚠️ HealthDb: PENDING
+[16:08:41] ⚠️ AdbPresent: PENDING
+[16:08:41] ⚠️ AdbDevice: PENDING
+[16:08:41] ⚠️ FlutterClean: SKIPPED
+[16:08:41] ⚠️ FlutterPubGet: PENDING
+[16:08:41] ⚠️ FlutterRun: PENDING
+[16:08:41] Log: C:\Users\DeivyRafaelPatinoUga\anaconda3\Atalaya\Mobile\logs\run_v3_20260415_160624.txt
+[16:11:49] Saliendo...
