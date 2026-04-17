@@ -53,7 +53,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       extendBody: true,
       appBar: BrandTopBar(
         onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
-        onOpenMenu: _openLayoutControls,
+        onOpenMenu: () => _openLayoutControls(),
         onLogout: widget.onLogout,
       ),
       body: Container(
@@ -80,8 +80,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
               final isWideLayout = width >= 1100;
 
               return isWideLayout
-                  ? _buildWideLayout(context, viewState, uiModel, payload.job, unitPrefs)
-                  : _buildMobileLayout(context, viewState, uiModel, payload.job, unitPrefs);
+                  ? _buildWideLayout(viewState, uiModel, payload.job)
+                  : _buildMobileLayout(context, viewState, uiModel, payload.job);
             },
           ),
         ),
@@ -94,67 +94,24 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     DashboardViewState viewState,
     DashboardUiModel uiModel,
     String job,
-    Map<String, String> unitPrefs,
   ) {
-    final selectedTile = _findSelectedTile(uiModel);
     return CustomScrollView(
       slivers: <Widget>[
-        SliverPadding(
+        _buildOverviewSliver(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate.fixed(<Widget>[
-              _DashboardHeading(
-                title: uiModel.appTitle,
-                status: uiModel.wellStatus,
-                selectedVariableId: uiModel.selectedVariableId,
-                densityMode: _densityMode,
-                onDensityChanged: _setDensityMode,
-                layoutMode: _tileLayoutMode,
-                onLayoutChanged: _setTileLayoutMode,
-              ),
-            ]),
-          ),
+          viewState: viewState,
+          uiModel: uiModel,
+          job: job,
         ),
+        _buildTilesGrid(viewState, uiModel),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 12),
-            child: LayoutSummaryChips(
-              tileCount: uiModel.tiles.length,
-              statusText: viewState.connectionStatus == ConnectionStatus.connected
-                  ? 'Estado: En línea'
-                  : 'Estado: Desactualizado',
-              statusColor: viewState.connectionStatus == ConnectionStatus.connected
-                  ? LayoutTokens.accentGreen
-                  : LayoutTokens.accentOrange,
-              densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
-              layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
-              onTapDensity: () => _openLayoutControls(),
-              onTapLayout: () => _openLayoutControls(),
-              onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              MediaQuery.of(context).padding.bottom + 12,
             ),
-          ),
-        ),
-        if (selectedTile != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _SelectedVariableBanner(
-                tile: selectedTile,
-              ),
-            ),
-          ),
-        SliverToBoxAdapter(
-          child: WellOverviewCard(
-            well: uiModel.activeWell,
-            job: job,
-            isActive: viewState.connectionStatus == ConnectionStatus.connected,
-          ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 16)),
-        _buildTilesGrid(viewState, uiModel, job, unitPrefs),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(0, 12, 0, MediaQuery.of(context).padding.bottom + 12),
             child: PredictorAlertsDock(
               alerts: viewState.payload.alerts,
               onOpenAlert: _openAlertDetail,
@@ -166,14 +123,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
 
   Widget _buildWideLayout(
-    BuildContext context,
     DashboardViewState viewState,
     DashboardUiModel uiModel,
     String job,
-    Map<String, String> unitPrefs,
   ) {
-    final selectedTile = _findSelectedTile(uiModel);
-
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1480),
@@ -182,59 +135,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             Expanded(
               child: CustomScrollView(
                 slivers: <Widget>[
-                  SliverPadding(
+                  _buildOverviewSliver(
                     padding: const EdgeInsets.fromLTRB(20, 14, 12, 20),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate.fixed(<Widget>[
-                        _DashboardHeading(
-                          title: uiModel.appTitle,
-                          status: uiModel.wellStatus,
-                          selectedVariableId: uiModel.selectedVariableId,
-                          densityMode: _densityMode,
-                          onDensityChanged: _setDensityMode,
-                          layoutMode: _tileLayoutMode,
-                          onLayoutChanged: _setTileLayoutMode,
-                        ),
-                      ]),
-                    ),
+                    viewState: viewState,
+                    uiModel: uiModel,
+                    job: job,
                   ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 10, bottom: 12),
-                      child: LayoutSummaryChips(
-                        tileCount: uiModel.tiles.length,
-                        statusText: viewState.connectionStatus == ConnectionStatus.connected
-                            ? 'Estado: En línea'
-                            : 'Estado: Desactualizado',
-                        statusColor: viewState.connectionStatus == ConnectionStatus.connected
-                            ? LayoutTokens.accentGreen
-                            : LayoutTokens.accentOrange,
-                        densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
-                        layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
-                        onTapDensity: () => _openLayoutControls(),
-                        onTapLayout: () => _openLayoutControls(),
-                        onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
-                      ),
-                    ),
-                  ),
-                  if (selectedTile != null)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _SelectedVariableBanner(
-                          tile: selectedTile,
-                        ),
-                      ),
-                    ),
-                  SliverToBoxAdapter(
-                    child: WellOverviewCard(
-                      well: uiModel.activeWell,
-                      job: job,
-                      isActive: viewState.connectionStatus == ConnectionStatus.connected,
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                  _buildTilesGrid(viewState, uiModel, job, unitPrefs),
+                  _buildTilesGrid(viewState, uiModel),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
                 ],
               ),
             ),
@@ -255,11 +163,57 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
+  Widget _buildOverviewSliver({
+    required EdgeInsets padding,
+    required DashboardViewState viewState,
+    required DashboardUiModel uiModel,
+    required String job,
+  }) {
+    final selectedTile = _findSelectedTile(uiModel);
+
+    return SliverPadding(
+      padding: padding,
+      sliver: SliverList(
+        delegate: SliverChildListDelegate.fixed(<Widget>[
+          _DashboardHeading(
+            title: uiModel.appTitle,
+            status: uiModel.wellStatus,
+            selectedVariableId: uiModel.selectedVariableId,
+          ),
+          const SizedBox(height: 12),
+          WellOverviewCard(
+            well: uiModel.activeWell,
+            job: job,
+            isActive: viewState.connectionStatus == ConnectionStatus.connected,
+          ),
+          const SizedBox(height: 12),
+          LayoutSummaryChips(
+            tileCount: uiModel.tiles.length,
+            statusText: viewState.connectionStatus == ConnectionStatus.connected
+                ? 'Estado: En línea'
+                : 'Estado: Desactualizado',
+            statusColor: viewState.connectionStatus == ConnectionStatus.connected
+                ? LayoutTokens.accentGreen
+                : LayoutTokens.accentOrange,
+            densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
+            layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
+            onTapDensity: () => _openLayoutControls(),
+            onTapLayout: () => _openLayoutControls(),
+            onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
+          ),
+          if (selectedTile != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _SelectedVariableBanner(tile: selectedTile),
+          ],
+          const SizedBox(height: 16),
+        ]),
+      ),
+    );
+  }
+
   Widget _buildTilesGrid(
     DashboardViewState viewState,
     DashboardUiModel uiModel,
-    String job,
-    Map<String, String> unitPrefs,
   ) {
     if (uiModel.tiles.isEmpty) {
       return const SliverToBoxAdapter(
@@ -269,7 +223,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
     final itemBuilder = (BuildContext context, int index) {
       final model = uiModel.tiles[index];
-      final variable = viewState.payload.variables.firstWhere((item) => item.tag == model.id);
+      final variable = viewState.payload.variables.firstWhere(
+        (WellVariable item) => item.tag == model.id,
+      );
+
       return KpiTileV2(
         label: model.label,
         value: model.valueText,
@@ -280,7 +237,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         accentColor: model.accentColor,
         onTap: () {
           setState(() => _selectedVariableTag = model.id);
-          _openVariableDetail(context, variable, viewState.payload.well, job, unitPrefs);
+          _openVariableDetail(variable);
         },
       );
     };
@@ -288,8 +245,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     if (_tileLayoutMode == _TileLayoutMode.list) {
       return SliverList(
         delegate: SliverChildBuilderDelegate(
-          (context, index) => Padding(
-            padding: EdgeInsets.only(bottom: index == uiModel.tiles.length - 1 ? 0 : 12),
+          (BuildContext context, int index) => Padding(
+            padding: EdgeInsets.only(
+              bottom: index == uiModel.tiles.length - 1 ? 0 : 12,
+            ),
             child: SizedBox(
               height: 170,
               child: itemBuilder(context, index),
@@ -366,14 +325,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   Future<void> _persistTileLayoutMode(_TileLayoutMode mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_layoutPrefKey, mode.name);
-  }
-
-  Future<void> _openPredictorCharts() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const PredictorChartsScreen(),
-      ),
-    );
   }
 
   Future<void> _resetLayoutPreferences() async {
@@ -543,7 +494,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: severityColor.withValues(alpha: 0.16),
+                      color: severityColor.withOpacity(0.16),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(color: severityColor),
                     ),
@@ -636,8 +587,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     const SizedBox(height: 8),
                     SegmentedButton<_DensityMode>(
                       style: ButtonStyle(
-                        foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-                        backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
+                        foregroundColor: MaterialStateProperty.all(LayoutTokens.textSecondary),
+                        backgroundColor: MaterialStateProperty.all(LayoutTokens.surfaceCard),
                       ),
                       showSelectedIcon: false,
                       segments: const <ButtonSegment<_DensityMode>>[
@@ -666,8 +617,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     const SizedBox(height: 8),
                     SegmentedButton<_TileLayoutMode>(
                       style: ButtonStyle(
-                        foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-                        backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
+                        foregroundColor: MaterialStateProperty.all(LayoutTokens.textSecondary),
+                        backgroundColor: MaterialStateProperty.all(LayoutTokens.surfaceCard),
                       ),
                       showSelectedIcon: false,
                       segments: const <ButtonSegment<_TileLayoutMode>>[
@@ -734,40 +685,45 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
-  Future<void> _openVariableDetail(
-    BuildContext context,
-    WellVariable variable,
-    String well,
-    String job,
-    Map<String, String> unitPreferences,
-  ) async {
+
+  Future<void> _openVariableDetail(WellVariable variable) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0A162A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        final _ = well;
-        final __ = job;
-        final ___ = unitPreferences;
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext _) {
         return FractionallySizedBox(
-          heightFactor: 0.92,
-          child: PredictorChartsPanel(
-            embedded: true,
-            initialType: _predictorTypeForVariable(variable.tag),
+          heightFactor: 0.94,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: PredictorChartsPanel(
+              embedded: true,
+              initialType: _predictorTypeForVariable(variable),
+              sourceLabel: variable.label,
+              sourceTag: variable.tag,
+            ),
           ),
         );
       },
     );
   }
 
-  PredictorChartType _predictorTypeForVariable(String tag) {
-    final normalized = tag.toLowerCase();
-    if (normalized.contains('hook_load')) return PredictorChartType.hookLoad;
-    if (normalized.contains('torque')) return PredictorChartType.surfaceTorque;
-    if (normalized.contains('pump_pressure')) return PredictorChartType.pumpPressure;
+  PredictorChartType _predictorTypeForVariable(WellVariable variable) {
+    final signature = '${variable.tag} ${variable.label}'.toLowerCase();
+
+    if (signature.contains('torque')) {
+      return PredictorChartType.surfaceTorque;
+    }
+
+    if (signature.contains('pump') || signature.contains('pressure')) {
+      return PredictorChartType.pumpPressure;
+    }
+
+    if (signature.contains('hook') || signature.contains('load')) {
+      return PredictorChartType.hookLoad;
+    }
+
     return PredictorChartType.hookLoad;
   }
 }
@@ -777,133 +733,57 @@ class _DashboardHeading extends StatelessWidget {
     required this.title,
     required this.status,
     required this.selectedVariableId,
-    required this.densityMode,
-    required this.onDensityChanged,
-    required this.layoutMode,
-    required this.onLayoutChanged,
   });
 
   final String title;
   final String status;
   final String? selectedVariableId;
-  final _DensityMode densityMode;
-  final ValueChanged<_DensityMode> onDensityChanged;
-  final _TileLayoutMode layoutMode;
-  final ValueChanged<_TileLayoutMode> onLayoutChanged;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final showInlineControls = constraints.maxWidth >= 760;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          title,
+          style: const TextStyle(
+            color: LayoutTokens.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          status,
+          style: const TextStyle(color: LayoutTokens.textSecondary),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Toca una variable para abrir el predictor en modal.',
+          style: TextStyle(
+            color: LayoutTokens.textMuted,
+            fontSize: 12,
+          ),
+        ),
+        if (selectedVariableId != null) ...<Widget>[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: LayoutTokens.surfaceCard,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: LayoutTokens.dividerSubtle),
+            ),
+            child: Text(
+              'Tag: $selectedVariableId',
               style: const TextStyle(
-                color: LayoutTokens.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 20,
+                color: LayoutTokens.textSecondary,
+                fontSize: 12,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              status,
-              style: const TextStyle(color: LayoutTokens.textSecondary),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: <Widget>[
-                if (selectedVariableId != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: LayoutTokens.surfaceCard,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: LayoutTokens.dividerSubtle),
-                    ),
-                    child: Text(
-                      'Tag: $selectedVariableId',
-                      style: const TextStyle(
-                        color: LayoutTokens.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                OutlinedButton.icon(
-                  onPressed: onOpenPredictorCharts,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: LayoutTokens.textSecondary,
-                    side: const BorderSide(color: LayoutTokens.dividerSubtle),
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  icon: const Icon(Icons.multiline_chart_rounded, size: 16),
-                  label: const Text(
-                    'Predictor Charts',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
-                if (!showInlineControls)
-                  const SizedBox.shrink()
-                else ...<Widget>[
-                  SegmentedButton<_DensityMode>(
-                    style: ButtonStyle(
-                      foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-                      backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
-                    ),
-                    showSelectedIcon: false,
-                    segments: const <ButtonSegment<_DensityMode>>[
-                      ButtonSegment<_DensityMode>(
-                        value: _DensityMode.compact,
-                        label: Text('Compacto'),
-                      ),
-                      ButtonSegment<_DensityMode>(
-                        value: _DensityMode.comfortable,
-                        label: Text('Cómodo'),
-                      ),
-                    ],
-                    selected: <_DensityMode>{densityMode},
-                    onSelectionChanged: (selection) {
-                      if (selection.isNotEmpty) {
-                        onDensityChanged(selection.first);
-                      }
-                    },
-                  ),
-                  SegmentedButton<_TileLayoutMode>(
-                    style: ButtonStyle(
-                      foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-                      backgroundColor: WidgetStateProperty.all(LayoutTokens.surfaceCard),
-                    ),
-                    showSelectedIcon: false,
-                    segments: const <ButtonSegment<_TileLayoutMode>>[
-                      ButtonSegment<_TileLayoutMode>(
-                        value: _TileLayoutMode.grid,
-                        icon: Icon(Icons.grid_view_rounded, size: 18),
-                      ),
-                      ButtonSegment<_TileLayoutMode>(
-                        value: _TileLayoutMode.list,
-                        icon: Icon(Icons.view_agenda_rounded, size: 18),
-                      ),
-                    ],
-                    selected: <_TileLayoutMode>{layoutMode},
-                    onSelectionChanged: (selection) {
-                      if (selection.isNotEmpty) {
-                        onLayoutChanged(selection.first);
-                      }
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ],
     );
   }
 }
