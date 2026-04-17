@@ -1,0 +1,11 @@
+[project]
+name = "atalaya-mobile"
+version = "2.0.0"
+description = "Atalaya Mobile - Live monitor"
+requires-python = ">=3.10"
+dependencies = [
+  "flet==0.80.2",
+  "flet-charts==0.80.2",
+  "pg8000",
+  "matplotlib",
+]

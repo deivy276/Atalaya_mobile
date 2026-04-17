@@ -1,0 +1,70 @@
+
+name: Build Android APK
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./Mobile
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            Mobile/pyproject.toml
+            Mobile/requirements.txt
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.x"
+          channel: stable
+          cache: true
+
+      - name: Show project files (debug)
+        run: |
+          echo "PWD=$(pwd)"
+          ls -la
+          echo "---- pyproject.toml ----"
+          sed -n '1,200p' pyproject.toml
+          echo "---- requirements.txt ----"
+          if [ -f requirements.txt ]; then nl -ba requirements.txt; else echo "No requirements.txt in Mobile/"; fi
+
+      - name: Install dependencies (runner sanity check)
+        run: |
+          python -m pip install --upgrade pip
+          # Instala dependencias desde pyproject.toml
+          python -m pip install .
+          # Verifica imports clave (esto NO garantiza el APK, pero evita errores obvios)
+          python -c "import flet; import flet_charts; import pg8000; print('OK: imports en runner')"
+
+      - name: Build APK
+        run: |
+          flet --version
+          # Build desde la carpeta Mobile; limpia caché para que NO reutilice builds sin deps
+          flet build apk -vv --clear-cache -o dist .
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atalaya-app
+          path: Mobile/dist/**/*.apk
