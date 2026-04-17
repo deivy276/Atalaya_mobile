@@ -31,18 +31,24 @@ class PredictorChartsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
+
+
+
     return Scaffold(
       appBar: AppBar(
-<<<<<<< HEAD
         title: const Text('Predictor Charts'),
       ),
       body: PredictorChartsPanel(
         initialType: initialType,
         sourceLabel: sourceLabel,
         sourceTag: sourceTag,
-=======
+      ),
+    );
+
+
         title: Text('Predictor Charts'),
->>>>>>> 8f5527525c01c98e74f3a5ec6cbd76500699c615
+8f5527525c01c98e74f3a5ec6cbd76500699c615
       ),
     );
   }
