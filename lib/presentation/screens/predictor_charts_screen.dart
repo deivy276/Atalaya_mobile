@@ -25,11 +25,11 @@ enum PredictorChartType {
 class _PredictorChartsScreenState extends State<PredictorChartsScreen> {
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppBar(
+    return Scaffold(
+      appBar: const AppBar(
         title: Text('Predictor Charts'),
       ),
-      body: PredictorChartsPanel(),
+      body: const PredictorChartsPanel(),
     );
   }
 }
