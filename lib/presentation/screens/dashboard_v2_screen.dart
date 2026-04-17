@@ -13,6 +13,7 @@ import '../models/dashboard_ui_model.dart';
 import '../providers/dashboard_controller.dart';
 import '../providers/trend_controller.dart';
 import '../providers/unit_preferences_controller.dart';
+import 'predictor_charts_screen.dart';
 import '../widgets/trend_chart_widget.dart';
 import '../widgets/v2/brand_top_bar.dart';
 import '../widgets/v2/kpi_tile_v2.dart';
@@ -114,6 +115,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                 layoutMode: _tileLayoutMode,
                 onLayoutChanged: _setTileLayoutMode,
                 onOpenControls: () => _openLayoutControls(),
+                onOpenPredictorCharts: _openPredictorCharts,
               ),
             ]),
           ),
@@ -198,6 +200,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                           layoutMode: _tileLayoutMode,
                           onLayoutChanged: _setTileLayoutMode,
                           onOpenControls: () => _openLayoutControls(),
+                          onOpenPredictorCharts: _openPredictorCharts,
                         ),
                       ]),
                     ),
@@ -370,6 +373,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   Future<void> _persistTileLayoutMode(_TileLayoutMode mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_layoutPrefKey, mode.name);
+  }
+
+  Future<void> _openPredictorCharts() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PredictorChartsScreen(),
+      ),
+    );
   }
 
   Future<void> _resetLayoutPreferences() async {
@@ -838,6 +849,7 @@ class _DashboardHeading extends StatelessWidget {
     required this.layoutMode,
     required this.onLayoutChanged,
     required this.onOpenControls,
+    required this.onOpenPredictorCharts,
   });
 
   final String title;
@@ -848,6 +860,7 @@ class _DashboardHeading extends StatelessWidget {
   final _TileLayoutMode layoutMode;
   final ValueChanged<_TileLayoutMode> onLayoutChanged;
   final VoidCallback onOpenControls;
+  final VoidCallback onOpenPredictorCharts;
 
   @override
   Widget build(BuildContext context) {
@@ -893,6 +906,20 @@ class _DashboardHeading extends StatelessWidget {
                       ),
                     ),
                   ),
+                OutlinedButton.icon(
+                  onPressed: onOpenPredictorCharts,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: LayoutTokens.textSecondary,
+                    side: const BorderSide(color: LayoutTokens.dividerSubtle),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  icon: const Icon(Icons.multiline_chart_rounded, size: 16),
+                  label: const Text(
+                    'Predictor Charts',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
                 if (!showInlineControls)
                   _CompactControlsHint(onTap: onOpenControls)
                 else ...<Widget>[
