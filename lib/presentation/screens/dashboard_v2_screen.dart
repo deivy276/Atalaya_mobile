@@ -99,74 +99,69 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     Map<String, String> unitPrefs,
   ) {
     final selectedTile = _findSelectedTile(uiModel);
-
-    return Stack(
-      children: <Widget>[
-        CustomScrollView(
-          slivers: <Widget>[
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate.fixed(<Widget>[
-                  _DashboardHeading(
-                    title: uiModel.appTitle,
-                    status: uiModel.wellStatus,
-                    selectedVariableId: uiModel.selectedVariableId,
-                    densityMode: _densityMode,
-                    onDensityChanged: _setDensityMode,
-                    layoutMode: _tileLayoutMode,
-                    onLayoutChanged: _setTileLayoutMode,
-                    onOpenControls: () => _openLayoutControls(),
-                  ),
-                ]),
+    return CustomScrollView(
+      slivers: <Widget>[
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate.fixed(<Widget>[
+              _DashboardHeading(
+                title: uiModel.appTitle,
+                status: uiModel.wellStatus,
+                selectedVariableId: uiModel.selectedVariableId,
+                densityMode: _densityMode,
+                onDensityChanged: _setDensityMode,
+                layoutMode: _tileLayoutMode,
+                onLayoutChanged: _setTileLayoutMode,
+                onOpenControls: () => _openLayoutControls(),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 10, bottom: 12),
-                child: LayoutSummaryChips(
-                  tileCount: uiModel.tiles.length,
-                  statusText: viewState.connectionStatus == ConnectionStatus.connected
-                      ? 'Estado: En línea'
-                      : 'Estado: Desactualizado',
-                  statusColor: viewState.connectionStatus == ConnectionStatus.connected
-                      ? LayoutTokens.accentGreen
-                      : LayoutTokens.accentOrange,
-                  densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
-                  layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
-                  onTapDensity: () => _openLayoutControls(),
-                  onTapLayout: () => _openLayoutControls(),
-                  onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
-                ),
-              ),
-            ),
-            if (selectedTile != null)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _SelectedVariableBanner(
-                    tile: selectedTile,
-                  ),
-                ),
-              ),
-            SliverToBoxAdapter(
-              child: WellOverviewCard(
-                well: uiModel.activeWell,
-                job: job,
-                isActive: viewState.connectionStatus == ConnectionStatus.connected,
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            _buildTilesGrid(viewState, uiModel, job, unitPrefs),
-          ],
+            ]),
+          ),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: PredictorAlertsDock(
-            alerts: viewState.payload.alerts,
-            onOpenAlert: _openAlertDetail,
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 12),
+            child: LayoutSummaryChips(
+              tileCount: uiModel.tiles.length,
+              statusText: viewState.connectionStatus == ConnectionStatus.connected
+                  ? 'Estado: En línea'
+                  : 'Estado: Desactualizado',
+              statusColor: viewState.connectionStatus == ConnectionStatus.connected
+                  ? LayoutTokens.accentGreen
+                  : LayoutTokens.accentOrange,
+              densityLabel: _densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo',
+              layoutLabel: _tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista',
+              onTapDensity: () => _openLayoutControls(),
+              onTapLayout: () => _openLayoutControls(),
+              onTapReset: _isDefaultLayoutConfig ? null : () => _confirmAndResetLayout(),
+            ),
+          ),
+        ),
+        if (selectedTile != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _SelectedVariableBanner(
+                tile: selectedTile,
+              ),
+            ),
+          ),
+        SliverToBoxAdapter(
+          child: WellOverviewCard(
+            well: uiModel.activeWell,
+            job: job,
+            isActive: viewState.connectionStatus == ConnectionStatus.connected,
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        _buildTilesGrid(viewState, uiModel, job, unitPrefs),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(0, 12, 0, MediaQuery.of(context).padding.bottom + 12),
+            child: PredictorAlertsDock(
+              alerts: viewState.payload.alerts,
+              onOpenAlert: _openAlertDetail,
+            ),
           ),
         ),
       ],
