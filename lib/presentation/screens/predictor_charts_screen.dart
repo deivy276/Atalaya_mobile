@@ -182,9 +182,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                     selectedColor: const Color(0x443FA7FF),
                     backgroundColor: LayoutTokens.surfaceCard,
                     side: BorderSide(
-                      color: isSelected
-                          ? const Color(0x883FA7FF)
-                          : LayoutTokens.dividerSubtle,
+                      color: isSelected ? const Color(0x883FA7FF) : LayoutTokens.dividerSubtle,
                     ),
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : LayoutTokens.textSecondary,
@@ -383,18 +381,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
 
     const minY = 0.0;
     const maxY = 8200.0;
-    const depths = <double>[
-      0,
-      800,
-      1600,
-      2400,
-      3200,
-      4200,
-      5200,
-      6200,
-      7200,
-      8000,
-    ];
+    const depths = <double>[0, 800, 1600, 2400, 3200, 4200, 5200, 6200, 7200, 8000];
 
     List<FlSpot> envelope(double offset) {
       return List<FlSpot>.generate(depths.length, (int index) {
