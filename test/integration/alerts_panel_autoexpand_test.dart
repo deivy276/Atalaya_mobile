@@ -6,6 +6,6 @@ void main() {
     (tester) async {
       // Placeholder: simular stream/polling de alerta nueva.
     },
-    skip: true, // TODO: habilitar con doble de test para alertas.
+    skip: true,
   );
 }
