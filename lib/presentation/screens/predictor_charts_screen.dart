@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/layout_tokens.dart';
 
+const String _specialPredictorScreenTitle = 'Special Predictor Screen';
+
 enum PredictorChartType {
   hookLoad('Hook Load', 'ton'),
   surfaceTorque('Surface Torque', 'ft-lbf'),
@@ -32,7 +34,7 @@ class PredictorChartsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Predictor Charts'),
+        title: const Text(_specialPredictorScreenTitle),
       ),
       body: PredictorChartsPanel(
         initialType: initialType,
@@ -91,6 +93,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
         ),
       ),
       child: SafeArea(
+        top: !widget.embedded,
         bottom: true,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
@@ -113,7 +116,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                   children: <Widget>[
                     const Expanded(
                       child: Text(
-                        'Predictor Charts',
+                        _specialPredictorScreenTitle,
                         style: TextStyle(
                           color: LayoutTokens.textPrimary,
                           fontSize: 20,
@@ -131,15 +134,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                     ),
                   ],
                 ),
-              ] else
-                const Text(
-                  'Predictor Charts',
-                  style: TextStyle(
-                    color: LayoutTokens.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+              ],
               const Text(
                 'Vista de solo lectura con mock data.',
                 style: TextStyle(color: LayoutTokens.textMuted),
@@ -192,7 +187,9 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                           : LayoutTokens.dividerSubtle,
                     ),
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : LayoutTokens.textSecondary,
+                      color: isSelected
+                          ? Colors.white
+                          : LayoutTokens.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                     onSelected: (_) => setState(() => _selected = type),
@@ -237,7 +234,8 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: true,
-                        horizontalInterval: (chartData.maxY - chartData.minY) / 6,
+                        horizontalInterval:
+                            (chartData.maxY - chartData.minY) / 6,
                         getDrawingHorizontalLine: (_) => const FlLine(
                           color: Color(0x334A6D96),
                           strokeWidth: 1,
@@ -335,7 +333,9 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                             .map(
                               (depth) => HorizontalLine(
                                 y: depth,
-                                color: LayoutTokens.accentRed.withValues(alpha: 0.60),
+                                color: LayoutTokens.accentRed.withValues(
+                                  alpha: 0.60,
+                                ),
                                 strokeWidth: 0.8,
                                 dashArray: const <int>[2, 3],
                               ),
@@ -408,7 +408,9 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
         final normalized = depth / maxY;
         final x = minX +
             (maxX - minX) * (0.05 + normalized * (0.85 + offset * 0.01)) +
-            math.sin((index + seed) * 0.6 + offset) * (maxX - minX) * 0.015;
+            math.sin((index + seed) * 0.6 + offset) *
+                (maxX - minX) *
+                0.015;
 
         return FlSpot(x.clamp(minX, maxX).toDouble(), depth);
       });
