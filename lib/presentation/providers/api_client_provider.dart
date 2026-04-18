@@ -56,18 +56,19 @@ String _formatAuthorizationHeader(String token) {
   return 'Bearer $trimmed';
 }
 
-String _connectivityHint(String baseUrl) {
+String _connectivityHint(String baseUrl, DioException error) {
   final lower = baseUrl.toLowerCase();
+  final details = error.error == null ? '' : ' Detalle: ${error.error}';
 
   if (kIsWeb) {
-    return 'Web usa http://localhost:8010 por defecto. Asegúrate de levantar el backend, permitir CORS o pasar --dart-define=ATALAYA_API_BASE_URL=$baseUrl.';
+    return 'Web usa http://localhost:8010 por defecto. Asegúrate de levantar el backend, permitir CORS o pasar --dart-define=ATALAYA_API_BASE_URL=$baseUrl.$details';
   }
 
   if (lower.contains('10.0.2.2') || lower.contains('127.0.0.1') || lower.contains('localhost')) {
-    return 'Ese host funciona solo en emulador/desktop local. En un teléfono físico usa la IP LAN del servidor o un host público como https://atalaya-predictor-staging.onrender.com.';
+    return 'Ese host funciona solo en emulador/desktop local. En un teléfono físico usa la IP LAN del servidor o un host público como https://atalaya-predictor-staging.onrender.com.$details';
   }
 
-  return 'Verifica que el backend esté arriba y accesible desde este dispositivo.';
+  return 'Verifica desde el navegador del teléfono que $baseUrl/api/v1/mobile/health abra y devuelva JSON. Si Render estaba dormido, espera unos segundos y vuelve a intentar.$details';
 }
 
 final sessionSecureStorageProvider = Provider<SessionSecureStorage>(
@@ -83,12 +84,15 @@ final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
+      // Render staging puede tardar en responder cuando el servicio despierta.
+      // Estos timeouts evitan falsos negativos en teléfono físico.
+      connectTimeout: const Duration(seconds: 45),
+      receiveTimeout: const Duration(seconds: 60),
+      sendTimeout: const Duration(seconds: 45),
       headers: const <String, dynamic>{
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'User-Agent': 'Atalaya-Mobile/1.0',
       },
       responseType: ResponseType.json,
     ),
@@ -151,7 +155,7 @@ final dioProvider = Provider<Dio>((ref) {
         if (isConnectivityError) {
           handler.next(
             error.copyWith(
-              message: 'No se pudo conectar a $baseUrl. ${_connectivityHint(baseUrl)}',
+              message: 'No se pudo conectar a $baseUrl. ${_connectivityHint(baseUrl, error)}',
             ),
           );
           return;
