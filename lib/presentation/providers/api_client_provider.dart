@@ -8,10 +8,10 @@ import '../../data/repositories/atalaya_repository_impl.dart';
 import '../../data/repositories/mock_atalaya_repository.dart';
 import '../../domain/repositories/atalaya_repository.dart';
 
-bool _mockModeEnabled() {
+bool atalayaMockModeEnabled() {
   const raw = String.fromEnvironment('ATALAYA_USE_MOCK', defaultValue: 'false');
   final normalized = raw.trim().toLowerCase();
-  return normalized == 'true' || normalized == '1';
+  return normalized == 'true' || normalized == '1' || normalized == 'yes' || normalized == 'on';
 }
 
 String _normalizeBaseUrl(String raw) {
@@ -47,13 +47,9 @@ String _defaultApiBaseUrl() {
 
 String _formatAuthorizationHeader(String token) {
   final trimmed = token.trim();
-  final normalized = trimmed.toLowerCase();
+  final lower = trimmed.toLowerCase();
 
-  if (normalized.startsWith('bearer ') || normalized.startsWith('basic ')) {
-    return trimmed;
-  }
-
-  if (trimmed.startsWith('sid:')) {
+  if (lower.startsWith('bearer ') || lower.startsWith('basic ')) {
     return trimmed;
   }
 
@@ -61,14 +57,14 @@ String _formatAuthorizationHeader(String token) {
 }
 
 String _connectivityHint(String baseUrl) {
-  final normalized = baseUrl.toLowerCase();
+  final lower = baseUrl.toLowerCase();
 
   if (kIsWeb) {
     return 'Web usa http://localhost:8010 por defecto. Asegúrate de levantar el backend, permitir CORS o pasar --dart-define=ATALAYA_API_BASE_URL=$baseUrl.';
   }
 
-  if (normalized.contains('10.0.2.2') || normalized.contains('127.0.0.1') || normalized.contains('localhost')) {
-    return 'Ese host funciona solo en emulador/desktop local. En un teléfono físico usa la IP LAN del servidor o un host público, por ejemplo --dart-define=ATALAYA_API_BASE_URL=https://atalaya-predictor-staging.onrender.com.';
+  if (lower.contains('10.0.2.2') || lower.contains('127.0.0.1') || lower.contains('localhost')) {
+    return 'Ese host funciona solo en emulador/desktop local. En un teléfono físico usa la IP LAN del servidor o un host público como https://atalaya-predictor-staging.onrender.com.';
   }
 
   return 'Verifica que el backend esté arriba y accesible desde este dispositivo.';
@@ -94,6 +90,7 @@ final dioProvider = Provider<Dio>((ref) {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
+      responseType: ResponseType.json,
     ),
   );
 
@@ -102,9 +99,9 @@ final dioProvider = Provider<Dio>((ref) {
       onRequest: (options, handler) async {
         try {
           final path = options.path.toLowerCase();
-          final isLoginRequest = path.endsWith('/auth/login') || path == '/auth/login';
+          final isLoginRequest = path == '/auth/login' || path.endsWith('/auth/login');
 
-          if (isLoginRequest) {
+          if (isLoginRequest || atalayaMockModeEnabled()) {
             options.headers.remove('Authorization');
             handler.next(options);
             return;
@@ -113,12 +110,8 @@ final dioProvider = Provider<Dio>((ref) {
           final token = await sessionStorage.readToken();
           final expiresAt = await sessionStorage.readExpiresAt();
           final now = DateTime.now().toUtc();
-
           final hasValidSession =
-              token != null &&
-              token.trim().isNotEmpty &&
-              expiresAt != null &&
-              expiresAt.isAfter(now);
+              token != null && token.trim().isNotEmpty && expiresAt != null && expiresAt.isAfter(now);
 
           if (hasValidSession) {
             options.headers['Authorization'] = _formatAuthorizationHeader(token);
@@ -136,15 +129,14 @@ final dioProvider = Provider<Dio>((ref) {
       },
       onError: (error, handler) async {
         final type = error.type;
-        final isConnectivityError =
-            type == DioExceptionType.connectionTimeout ||
+        final isConnectivityError = type == DioExceptionType.connectionTimeout ||
             type == DioExceptionType.connectionError ||
             type == DioExceptionType.receiveTimeout ||
             type == DioExceptionType.sendTimeout;
 
         final statusCode = error.response?.statusCode;
         final requestPath = error.requestOptions.path.toLowerCase();
-        final isLoginRequest = requestPath.endsWith('/auth/login') || requestPath == '/auth/login';
+        final isLoginRequest = requestPath == '/auth/login' || requestPath.endsWith('/auth/login');
 
         if (statusCode == 401 && !isLoginRequest) {
           await sessionStorage.clearSession();
@@ -170,9 +162,7 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
 
-  ref.onDispose(() {
-    dio.close(force: true);
-  });
+  ref.onDispose(() => dio.close(force: true));
 
   return dio;
 });
@@ -182,7 +172,7 @@ final atalayaApiClientProvider = Provider<AtalayaApiClient>(
 );
 
 final atalayaRepositoryProvider = Provider<AtalayaRepository>((ref) {
-  if (_mockModeEnabled()) {
+  if (atalayaMockModeEnabled()) {
     return const MockAtalayaRepository();
   }
 

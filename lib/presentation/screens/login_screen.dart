@@ -5,12 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/api_client_provider.dart';
 import '../widgets/v2/login_card.dart';
 
-bool _mockModeEnabled() {
-  const raw = String.fromEnvironment('ATALAYA_USE_MOCK', defaultValue: 'false');
-  final normalized = raw.trim().toLowerCase();
-  return normalized == 'true' || normalized == '1' || normalized == 'yes' || normalized == 'on';
-}
-
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({
     super.key,
@@ -28,8 +22,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   static const Duration _fallbackSessionTtl = Duration(hours: 12);
-  static const String _mockUsername = 'demo';
-  static const String _mockPassword = 'demo';
 
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -85,7 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      if (_mockModeEnabled()) {
+      if (atalayaMockModeEnabled()) {
         await _submitMockLogin(username: username, password: password);
         return;
       }
@@ -103,14 +95,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final payload = _asStringKeyedMap(response.data);
 
       if (statusCode >= 200 && statusCode < 300) {
-        final token = _extractToken(payload) ?? 'sid:$username:${DateTime.now().millisecondsSinceEpoch}';
-        final expiresAt = _extractExpiresAt(payload) ?? DateTime.now().toUtc().add(_fallbackSessionTtl);
+        final session = _buildSessionPayload(
+          username: username,
+          payload: payload,
+        );
 
         if (!mounted) {
           return;
         }
 
-        await widget.onLoginSuccess(token: token, expiresAt: expiresAt);
+        await widget.onLoginSuccess(
+          token: session.token,
+          expiresAt: session.expiresAt,
+        );
         return;
       }
 
@@ -118,7 +115,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
 
-      setState(() => _errorText = _extractErrorMessage(payload, 'Credenciales inválidas.'));
+      setState(
+        () => _errorText = _extractErrorMessage(
+          payload,
+          defaultMessage: 'Credenciales inválidas.',
+        ),
+      );
     } on DioException catch (error) {
       if (!mounted) {
         return;
@@ -129,7 +131,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ? error.message!.trim()
           : 'No fue posible iniciar sesión.';
 
-      setState(() => _errorText = _extractErrorMessage(payload, fallbackMessage));
+      setState(
+        () => _errorText = _extractErrorMessage(
+          payload,
+          defaultMessage: fallbackMessage,
+        ),
+      );
     } catch (_) {
       if (!mounted) {
         return;
@@ -147,34 +154,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     required String username,
     required String password,
   }) async {
-    final isValidMockCredentials = username == _mockUsername && password == _mockPassword;
-
-    if (!isValidMockCredentials) {
+    final valid = username == 'demo' && password == 'demo';
+    if (!valid) {
       if (!mounted) {
         return;
       }
-
-      setState(() => _errorText = 'Modo mock: usa demo / demo para entrar.');
-      return;
-    }
-
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-
-    if (!mounted) {
+      setState(() => _errorText = 'Modo mock: usa demo / demo.');
       return;
     }
 
     await widget.onLoginSuccess(
-      token: 'mock:$username:${DateTime.now().millisecondsSinceEpoch}',
+      token: 'mock-token:${DateTime.now().millisecondsSinceEpoch}',
       expiresAt: DateTime.now().toUtc().add(_fallbackSessionTtl),
     );
   }
 
-  String? _extractToken(Map<String, dynamic>? payload) {
-    if (payload == null) {
-      return null;
+  _SessionPayload _buildSessionPayload({
+    required String username,
+    required Map<String, dynamic>? payload,
+  }) {
+    final token = _extractToken(payload);
+    if (token == null || token.trim().isEmpty) {
+      throw StateError('El backend no devolvió access_token/token para la sesión móvil.');
     }
 
+    return _SessionPayload(
+      token: token,
+      expiresAt: _extractExpiresAt(payload) ?? DateTime.now().toUtc().add(_fallbackSessionTtl),
+    );
+  }
+
+  String? _extractToken(Map<String, dynamic>? payload) {
     for (final map in _candidateMaps(payload)) {
       for (final key in const <String>[
         'access_token',
@@ -192,41 +202,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
     }
-
     return null;
   }
 
   DateTime? _extractExpiresAt(Map<String, dynamic>? payload) {
-    if (payload == null) {
-      return null;
-    }
-
     for (final map in _candidateMaps(payload)) {
       final expiresAtValue = map['expires_at'] ?? map['expiresAt'] ?? map['expiry'] ?? map['expires'];
-      final parsedExpiresAt = _parseDateTimeValue(expiresAtValue);
-      if (parsedExpiresAt != null) {
-        return parsedExpiresAt;
+      final expiresAt = _parseDateTimeValue(expiresAtValue);
+      if (expiresAt != null) {
+        return expiresAt;
       }
 
-      final expiresIn = _parseNumeric(map['expires_in'] ?? map['expiresIn']);
-      if (expiresIn != null && expiresIn > 0) {
-        return DateTime.now().toUtc().add(Duration(seconds: expiresIn.round()));
+      final expiresInValue = map['expires_in'] ?? map['expiresIn'];
+      final expiresIn = _parseDurationFromSeconds(expiresInValue);
+      if (expiresIn != null) {
+        return DateTime.now().toUtc().add(expiresIn);
       }
 
-      final ttlHours = _parseNumeric(map['ttl_hours'] ?? map['ttlHours']);
-      if (ttlHours != null && ttlHours > 0) {
-        return DateTime.now().toUtc().add(Duration(minutes: (ttlHours * 60).round()));
+      final ttlSecondsValue = map['ttl_seconds'] ?? map['ttlSeconds'];
+      final ttlSeconds = _parseDurationFromSeconds(ttlSecondsValue);
+      if (ttlSeconds != null) {
+        return DateTime.now().toUtc().add(ttlSeconds);
+      }
+
+      final ttlHoursValue = map['ttl_hours'] ?? map['ttlHours'];
+      final ttlHours = _parseDurationFromHours(ttlHoursValue);
+      if (ttlHours != null) {
+        return DateTime.now().toUtc().add(ttlHours);
+      }
+
+      final ttlMinutesValue = map['ttl_minutes'] ?? map['ttlMinutes'];
+      final ttlMinutes = _parseDurationFromMinutes(ttlMinutesValue);
+      if (ttlMinutes != null) {
+        return DateTime.now().toUtc().add(ttlMinutes);
       }
     }
 
     return null;
   }
 
-  String _extractErrorMessage(Map<String, dynamic>? payload, String defaultMessage) {
-    if (payload == null) {
-      return defaultMessage;
-    }
-
+  String _extractErrorMessage(
+    Map<String, dynamic>? payload, {
+    required String defaultMessage,
+  }) {
     for (final map in _candidateMaps(payload)) {
       for (final key in const <String>['detail', 'message', 'error', 'description']) {
         final value = map[key];
@@ -239,9 +257,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return defaultMessage;
   }
 
-  List<Map<String, dynamic>> _candidateMaps(Map<String, dynamic> payload) {
+  List<Map<String, dynamic>> _candidateMaps(Map<String, dynamic>? payload) {
+    if (payload == null) {
+      return const <Map<String, dynamic>>[];
+    }
+
     final maps = <Map<String, dynamic>>[payload];
-    for (final key in const <String>['data', 'result', 'session', 'payload']) {
+    for (final key in const <String>['data', 'result', 'session', 'payload', 'user']) {
       final nested = _asStringKeyedMap(payload[key]);
       if (nested != null) {
         maps.add(nested);
@@ -255,7 +277,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return null;
     }
 
-    return value.map((key, dynamic entryValue) => MapEntry(key.toString(), entryValue));
+    return value.map(
+      (key, dynamic entryValue) => MapEntry(key.toString(), entryValue),
+    );
   }
 
   DateTime? _parseDateTimeValue(dynamic value) {
@@ -307,6 +331,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return null;
   }
 
+  Duration? _parseDurationFromSeconds(dynamic value) {
+    final numeric = _parseNumeric(value);
+    if (numeric == null || numeric <= 0) {
+      return null;
+    }
+    return Duration(seconds: numeric.round());
+  }
+
+  Duration? _parseDurationFromHours(dynamic value) {
+    final numeric = _parseNumeric(value);
+    if (numeric == null || numeric <= 0) {
+      return null;
+    }
+    return Duration(minutes: (numeric * 60).round());
+  }
+
+  Duration? _parseDurationFromMinutes(dynamic value) {
+    final numeric = _parseNumeric(value);
+    if (numeric == null || numeric <= 0) {
+      return null;
+    }
+    return Duration(minutes: numeric.round());
+  }
+
   double? _parseNumeric(dynamic value) {
     if (value is num) {
       return value.toDouble();
@@ -338,4 +386,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       },
     );
   }
+}
+
+class _SessionPayload {
+  const _SessionPayload({
+    required this.token,
+    required this.expiresAt,
+  });
+
+  final String token;
+  final DateTime expiresAt;
 }
