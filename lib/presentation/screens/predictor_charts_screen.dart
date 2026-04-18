@@ -93,7 +93,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
         ),
       ),
       child: SafeArea(
-        top: false,
+        top: !widget.embedded,
         bottom: true,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
