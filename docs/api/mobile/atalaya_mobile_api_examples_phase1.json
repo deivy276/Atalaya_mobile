@@ -1,0 +1,61 @@
+{
+  "loginRequest": {
+    "username": "mobile_test@atalaya.local",
+    "password": "AtalayaTest123!"
+  },
+  "loginResponse": {
+    "access_token": "eyJ.example.token",
+    "token_type": "bearer",
+    "expires_in": 43200,
+    "user": {
+      "id": "mobile_test",
+      "username": "mobile_test@atalaya.local",
+      "role": "operator"
+    }
+  },
+  "dashboardResponse": {
+    "well": "IXACHI-45",
+    "job": "Monitoreo de pozo",
+    "latestSampleAt": "2026-04-18T18:00:00Z",
+    "staleThresholdSeconds": 12,
+    "variables": [
+      {
+        "slot": 1,
+        "label": "RPM",
+        "tag": "rpm",
+        "rawUnit": "rpm",
+        "value": 132.4,
+        "sampleAt": "2026-04-18T18:00:00Z",
+        "configured": true
+      },
+      {
+        "slot": 6,
+        "label": "Hook Load",
+        "tag": "hook_load",
+        "rawUnit": "klbf",
+        "value": 192.0,
+        "sampleAt": "2026-04-18T18:00:00Z",
+        "configured": true
+      }
+    ],
+    "alerts": [
+      {
+        "id": "kp-001",
+        "description": "KP: torque en tendencia ascendente.",
+        "severity": "ATTENTION",
+        "createdAt": "2026-04-18T17:58:00Z",
+        "attachmentsCount": 0,
+        "attachments": []
+      }
+    ]
+  },
+  "trendResponse": {
+    "tag": "rpm",
+    "range": "30m",
+    "points": [
+      {"timestamp": "2026-04-18T17:30:00Z", "value": 128.2},
+      {"timestamp": "2026-04-18T17:45:00Z", "value": 130.1},
+      {"timestamp": "2026-04-18T18:00:00Z", "value": 132.4}
+    ]
+  }
+}
