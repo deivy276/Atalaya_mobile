@@ -202,7 +202,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     Widget buildTileItem(BuildContext context, int index) {
       final model = uiModel.tiles[index];
       final variable = viewState.payload.variables.firstWhere(
-        (item) => item.tag == model.id,
+        (WellVariable item) => item.tag == model.id,
       );
 
       return KpiTileV2(
@@ -215,7 +215,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         accentColor: model.accentColor,
         onTap: () {
           setState(() => _selectedVariableTag = model.id);
-          _openVariableDetail(context, variable);
+          _openVariableDetail(variable);
         },
       );
     }
@@ -261,11 +261,13 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
   VariableTileUiModel? _findSelectedTile(DashboardUiModel uiModel) {
     if (_selectedVariableTag == null) return null;
+
     for (final tile in uiModel.tiles) {
       if (tile.id == _selectedVariableTag) {
         return tile;
       }
     }
+
     return null;
   }
 
@@ -312,12 +314,16 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       _densityMode = _DensityMode.comfortable;
       _tileLayoutMode = _TileLayoutMode.grid;
     });
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_densityPrefKey);
     await prefs.remove(_layoutPrefKey);
   }
 
   Future<void> _confirmAndResetLayout({bool closeControlsSheet = false}) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -338,14 +344,18 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       },
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      return;
+    }
 
     await _resetLayoutPreferences();
     await HapticFeedback.lightImpact();
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       const SnackBar(
         content: Text('Layout restablecido a valores predeterminados'),
         duration: Duration(seconds: 2),
@@ -353,7 +363,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
 
     if (closeControlsSheet) {
-      Navigator.of(context).pop();
+      navigator.pop();
     }
   }
 
@@ -362,6 +372,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     Map<String, String> unitPreferences,
   ) {
     final payload = state.payload;
+
     final tiles = payload.variables.take(6).map((variable) {
       final displayUnit = UnitConverter.resolveDisplayUnit(
         slotIndex: variable.slot - 1,
@@ -447,7 +458,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         final severityColor = switch (alert.severity) {
           AlertSeverity.critical => LayoutTokens.accentRed,
           AlertSeverity.attention => LayoutTokens.accentOrange,
@@ -482,7 +493,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     ),
                     child: Text(
                       alert.severity.compactLabel,
-                      style: TextStyle(color: severityColor, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        color: severityColor,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const Spacer(),
@@ -531,9 +545,9 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
+          builder: (sheetContext, setSheetState) {
             return SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
@@ -667,34 +681,44 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
-  Future<void> _openVariableDetail(
-    BuildContext context,
-    WellVariable variable,
-  ) async {
+  Future<void> _openVariableDetail(WellVariable variable) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0A162A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext sheetContext) {
         return FractionallySizedBox(
-          heightFactor: 0.92,
-          child: PredictorChartsPanel(
-            embedded: true,
-            initialType: _predictorTypeForVariable(variable.tag),
+          heightFactor: 0.94,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: PredictorChartsPanel(
+              embedded: true,
+              initialType: _predictorTypeForVariable(variable),
+              sourceLabel: variable.label,
+              sourceTag: variable.tag,
+            ),
           ),
         );
       },
     );
   }
 
-  PredictorChartType _predictorTypeForVariable(String tag) {
-    final normalized = tag.toLowerCase();
-    if (normalized.contains('hook_load')) return PredictorChartType.hookLoad;
-    if (normalized.contains('torque')) return PredictorChartType.surfaceTorque;
-    if (normalized.contains('pump_pressure')) return PredictorChartType.pumpPressure;
+  PredictorChartType _predictorTypeForVariable(WellVariable variable) {
+    final signature = '${variable.tag} ${variable.label}'.toLowerCase();
+
+    if (signature.contains('torque')) {
+      return PredictorChartType.surfaceTorque;
+    }
+
+    if (signature.contains('pump') || signature.contains('pressure')) {
+      return PredictorChartType.pumpPressure;
+    }
+
+    if (signature.contains('hook') || signature.contains('load')) {
+      return PredictorChartType.hookLoad;
+    }
+
     return PredictorChartType.hookLoad;
   }
 }
