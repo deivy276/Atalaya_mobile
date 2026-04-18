@@ -5,7 +5,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/layout_tokens.dart';
 
-const String _specialPredictorScreenTitle = 'Special Predictor Screen';
+class PredictorChartsScreen extends StatefulWidget {
+  const PredictorChartsScreen({super.key});
+
+  @override
+  State<PredictorChartsScreen> createState() => _PredictorChartsScreenState();
+}
 
 enum PredictorChartType {
   hookLoad('Hook Load', 'ton'),
@@ -13,34 +18,18 @@ enum PredictorChartType {
   pumpPressure('Pump Pressure', 'psi');
 
   const PredictorChartType(this.label, this.unit);
-
   final String label;
   final String unit;
 }
 
-class PredictorChartsScreen extends StatelessWidget {
-  const PredictorChartsScreen({
-    super.key,
-    this.initialType = PredictorChartType.hookLoad,
-    this.sourceLabel,
-    this.sourceTag,
-  });
-
-  final PredictorChartType initialType;
-  final String? sourceLabel;
-  final String? sourceTag;
-
+class _PredictorChartsScreenState extends State<PredictorChartsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(_specialPredictorScreenTitle),
+        title: Text('Predictor Charts'),
       ),
-      body: PredictorChartsPanel(
-        initialType: initialType,
-        sourceLabel: sourceLabel,
-        sourceTag: sourceTag,
-      ),
+      body: const PredictorChartsPanel(),
     );
   }
 }
@@ -50,14 +39,10 @@ class PredictorChartsPanel extends StatefulWidget {
     super.key,
     this.embedded = false,
     this.initialType = PredictorChartType.hookLoad,
-    this.sourceLabel,
-    this.sourceTag,
   });
 
   final bool embedded;
   final PredictorChartType initialType;
-  final String? sourceLabel;
-  final String? sourceTag;
 
   @override
   State<PredictorChartsPanel> createState() => _PredictorChartsPanelState();
@@ -73,17 +58,8 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
   }
 
   @override
-  void didUpdateWidget(covariant PredictorChartsPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialType != widget.initialType) {
-      _selected = widget.initialType;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final chartData = _buildMockChartData(_selected);
-
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -94,102 +70,33 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
       ),
       child: SafeArea(
         top: !widget.embedded,
-        bottom: true,
+        bottom: !widget.embedded,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              if (widget.embedded) ...<Widget>[
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: LayoutTokens.textMuted,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
+              if (!widget.embedded)
+                const Text(
+                  'Vista de solo lectura (mock)',
+                  style: TextStyle(color: LayoutTokens.textMuted),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: <Widget>[
-                    const Expanded(
-                      child: Text(
-                        _specialPredictorScreenTitle,
-                        style: TextStyle(
-                          color: LayoutTokens.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      tooltip: 'Cerrar',
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: LayoutTokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const Text(
-                'Vista de solo lectura con mock data.',
-                style: TextStyle(color: LayoutTokens.textMuted),
-              ),
-              if (widget.sourceLabel != null || widget.sourceTag != null) ...<Widget>[
-                const SizedBox(height: 12),
-                _PredictorContextCard(
-                  sourceLabel: widget.sourceLabel,
-                  sourceTag: widget.sourceTag,
-                ),
-              ],
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const <Widget>[
-                  _StatusBadge(
-                    label: 'Solo lectura',
-                    icon: Icons.lock_outline_rounded,
-                  ),
-                  _StatusBadge(
-                    label: 'Mock data',
-                    icon: Icons.science_outlined,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Variables',
-                style: TextStyle(
-                  color: LayoutTokens.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: PredictorChartType.values.map((type) {
-                  final isSelected = _selected == type;
                   return ChoiceChip(
                     label: Text(type.label),
-                    selected: isSelected,
+                    selected: _selected == type,
                     showCheckmark: false,
                     selectedColor: const Color(0x443FA7FF),
                     backgroundColor: LayoutTokens.surfaceCard,
                     side: BorderSide(
-                      color: isSelected
-                          ? const Color(0x883FA7FF)
-                          : LayoutTokens.dividerSubtle,
+                      color: _selected == type ? const Color(0x883FA7FF) : LayoutTokens.dividerSubtle,
                     ),
                     labelStyle: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : LayoutTokens.textSecondary,
+                      color: _selected == type ? Colors.white : LayoutTokens.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                     onSelected: (_) => setState(() => _selected = type),
@@ -198,29 +105,24 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
               ),
               const SizedBox(height: 12),
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: LayoutTokens.surfaceCard.withValues(alpha: 0.68),
-                  borderRadius: BorderRadius.circular(12),
+                  color: LayoutTokens.surfaceCard.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: LayoutTokens.dividerSubtle),
                 ),
                 child: Text(
                   '${chartData.title} · Profundidad vs ${chartData.xAxisLabel}',
-                  style: const TextStyle(
-                    color: LayoutTokens.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: const TextStyle(color: LayoutTokens.textSecondary, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 12),
               Expanded(
                 child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(8, 12, 12, 8),
+                  padding: const EdgeInsets.fromLTRB(8, 12, 12, 6),
                   decoration: BoxDecoration(
-                    color: LayoutTokens.surfaceCard.withValues(alpha: 0.74),
-                    borderRadius: BorderRadius.circular(16),
+                    color: LayoutTokens.surfaceCard.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: LayoutTokens.dividerSubtle),
                   ),
                   child: LineChart(
@@ -234,8 +136,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: true,
-                        horizontalInterval:
-                            (chartData.maxY - chartData.minY) / 6,
+                        horizontalInterval: (chartData.maxY - chartData.minY) / 6,
                         getDrawingHorizontalLine: (_) => const FlLine(
                           color: Color(0x334A6D96),
                           strokeWidth: 1,
@@ -246,33 +147,20 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                         ),
                       ),
                       titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         leftTitles: AxisTitles(
                           axisNameWidget: const Padding(
                             padding: EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              'MD Depth (m)',
-                              style: TextStyle(
-                                color: LayoutTokens.textMuted,
-                                fontSize: 11,
-                              ),
-                            ),
+                            child: Text('MD Depth (m)', style: TextStyle(color: LayoutTokens.textMuted, fontSize: 11)),
                           ),
                           sideTitles: SideTitles(
                             showTitles: true,
                             interval: 1000,
-                            reservedSize: 42,
+                            reservedSize: 40,
                             getTitlesWidget: (value, _) => Text(
                               value.toStringAsFixed(0),
-                              style: const TextStyle(
-                                color: LayoutTokens.textMuted,
-                                fontSize: 10,
-                              ),
+                              style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 10),
                             ),
                           ),
                         ),
@@ -281,22 +169,16 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
                               chartData.xAxisLabel,
-                              style: const TextStyle(
-                                color: LayoutTokens.textMuted,
-                                fontSize: 11,
-                              ),
+                              style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 11),
                             ),
                           ),
                           sideTitles: SideTitles(
                             showTitles: true,
                             interval: chartData.xTick,
-                            reservedSize: 24,
+                            reservedSize: 22,
                             getTitlesWidget: (value, _) => Text(
                               value.toStringAsFixed(0),
-                              style: const TextStyle(
-                                color: LayoutTokens.textMuted,
-                                fontSize: 10,
-                              ),
+                              style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 10),
                             ),
                           ),
                         ),
@@ -332,10 +214,8 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                         horizontalLines: chartData.fieldDepths
                             .map(
                               (depth) => HorizontalLine(
-                                y: depth,
-                                color: LayoutTokens.accentRed.withValues(
-                                  alpha: 0.60,
-                                ),
+                                y: depth.dy,
+                                color: LayoutTokens.accentRed.withValues(alpha: 0.6),
                                 strokeWidth: 0.8,
                                 dashArray: const <int>[2, 3],
                               ),
@@ -346,14 +226,10 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
-                'Mock UI: ${chartData.envelopes.length} envelopes, '
-                'límites Warn/Crit y puntos de campo.',
-                style: const TextStyle(
-                  color: LayoutTokens.textMuted,
-                  fontSize: 12,
-                ),
+                'Mock UI: ${chartData.envelopes.length} envelopes, límites Warn/Crit y puntos de campo.',
+                style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 12),
               ),
             ],
           ),
@@ -368,51 +244,34 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
       PredictorChartType.surfaceTorque => 1.45,
       PredictorChartType.pumpPressure => 1.9,
     };
-
+    final unit = type.unit;
     final minX = switch (type) {
       PredictorChartType.hookLoad => 30.0,
       PredictorChartType.surfaceTorque => 50.0,
       PredictorChartType.pumpPressure => 900.0,
     };
-
     final maxX = switch (type) {
       PredictorChartType.hookLoad => 260.0,
       PredictorChartType.surfaceTorque => 350.0,
       PredictorChartType.pumpPressure => 3600.0,
     };
-
     final xTick = switch (type) {
       PredictorChartType.hookLoad => 50.0,
       PredictorChartType.surfaceTorque => 60.0,
       PredictorChartType.pumpPressure => 500.0,
     };
-
-    const minY = 0.0;
-    const maxY = 8200.0;
-    const depths = <double>[
-      0,
-      800,
-      1600,
-      2400,
-      3200,
-      4200,
-      5200,
-      6200,
-      7200,
-      8000,
-    ];
+    final minY = 0.0;
+    final maxY = 8200.0;
+    final depths = <double>[0, 800, 1600, 2400, 3200, 4200, 5200, 6200, 7200, 8000];
 
     List<FlSpot> envelope(double offset) {
-      return List<FlSpot>.generate(depths.length, (int index) {
-        final depth = depths[index];
+      return List<FlSpot>.generate(depths.length, (i) {
+        final depth = depths[i];
         final normalized = depth / maxY;
         final x = minX +
             (maxX - minX) * (0.05 + normalized * (0.85 + offset * 0.01)) +
-            math.sin((index + seed) * 0.6 + offset) *
-                (maxX - minX) *
-                0.015;
-
-        return FlSpot(x.clamp(minX, maxX).toDouble(), depth);
+            math.sin((i + seed) * 0.6 + offset) * (maxX - minX) * 0.015;
+        return FlSpot(x.clamp(minX, maxX), depth);
       });
     }
 
@@ -423,33 +282,21 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
       envelope(6.0),
       envelope(8.0),
     ];
-
     final warnLine = envelopes[1]
-        .map(
-          (FlSpot spot) => FlSpot(
-            (spot.x * 1.05).clamp(minX, maxX).toDouble(),
-            spot.y,
-          ),
-        )
+        .map((spot) => FlSpot((spot.x * 1.05).clamp(minX, maxX), spot.y))
         .toList(growable: false);
-
     final criticalLine = envelopes[2]
-        .map(
-          (FlSpot spot) => FlSpot(
-            (spot.x * 1.10).clamp(minX, maxX).toDouble(),
-            spot.y,
-          ),
-        )
+        .map((spot) => FlSpot((spot.x * 1.1).clamp(minX, maxX), spot.y))
         .toList(growable: false);
 
-    final fieldDepths = List<double>.generate(14, (int index) {
+    final fieldDepths = List<Offset>.generate(14, (index) {
       final depth = 400 + index * 420.0 + math.sin(index * 0.9 + seed) * 170;
-      return depth.clamp(0, maxY).toDouble();
+      return Offset(0, depth.clamp(0, maxY));
     });
 
     return _PredictorChartMockData(
       title: type.label,
-      xAxisLabel: '${type.label} (${type.unit})',
+      xAxisLabel: '${type.label} ($unit)',
       minX: minX,
       maxX: maxX,
       minY: minY,
@@ -459,93 +306,6 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
       warnLine: warnLine,
       criticalLine: criticalLine,
       fieldDepths: fieldDepths,
-    );
-  }
-}
-
-class _PredictorContextCard extends StatelessWidget {
-  const _PredictorContextCard({
-    this.sourceLabel,
-    this.sourceTag,
-  });
-
-  final String? sourceLabel;
-  final String? sourceTag;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          if (sourceLabel != null)
-            Text(
-              sourceLabel!,
-              style: const TextStyle(
-                color: LayoutTokens.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          if (sourceTag != null) ...<Widget>[
-            if (sourceLabel != null) const SizedBox(height: 4),
-            Text(
-              'Tag: $sourceTag',
-              style: const TextStyle(
-                color: LayoutTokens.textMuted,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({
-    required this.label,
-    required this.icon,
-  });
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(
-            icon,
-            size: 16,
-            color: LayoutTokens.textSecondary,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: LayoutTokens.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -575,5 +335,6 @@ class _PredictorChartMockData {
   final List<List<FlSpot>> envelopes;
   final List<FlSpot> warnLine;
   final List<FlSpot> criticalLine;
-  final List<double> fieldDepths;
+  final List<Offset> fieldDepths;
 }
+
