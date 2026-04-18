@@ -25,8 +25,7 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
   @override
   void initState() {
     super.initState();
-    _checkingSession = false;
-    _isAuthenticated = true;
+    _restoreSession();
   }
 
   @override
@@ -48,23 +47,36 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
   }
 
   Future<void> _restoreSession() async {
-    final token = await _sessionStorage.readToken();
-    final expiresAt = await _sessionStorage.readExpiresAt();
-    final now = DateTime.now().toUtc();
-    final isValid = token != null && token.trim().isNotEmpty && expiresAt != null && expiresAt.isAfter(now);
+    try {
+      final token = await _sessionStorage.readToken();
+      final expiresAt = await _sessionStorage.readExpiresAt();
+      final now = DateTime.now().toUtc();
+      final isValid = token != null && token.trim().isNotEmpty && expiresAt != null && expiresAt.isAfter(now);
 
-    if (!isValid) {
+      if (!isValid) {
+        await _sessionStorage.clearSession();
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isAuthenticated = isValid;
+        _checkingSession = false;
+      });
+    } catch (_) {
       await _sessionStorage.clearSession();
-    }
 
-    if (!mounted) {
-      return;
-    }
+      if (!mounted) {
+        return;
+      }
 
-    setState(() {
-      _isAuthenticated = isValid;
-      _checkingSession = false;
-    });
+      setState(() {
+        _isAuthenticated = false;
+        _checkingSession = false;
+      });
+    }
   }
 
   Future<void> _saveSessionAndEnter({
@@ -72,10 +84,16 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
     required DateTime expiresAt,
   }) async {
     await _sessionStorage.saveSession(token: token, expiresAt: expiresAt);
+    ref.invalidate(dashboardControllerProvider);
+
     if (!mounted) {
       return;
     }
-    setState(() => _isAuthenticated = true);
+
+    setState(() {
+      _isAuthenticated = true;
+      _checkingSession = false;
+    });
   }
 
   Future<void> _logout() async {
@@ -84,11 +102,17 @@ class _AuthGateScreenState extends ConsumerState<AuthGateScreen> {
     } catch (_) {
       // Best effort logout request; local session must still be cleared.
     }
+
     await _sessionStorage.clearSession();
     ref.invalidate(dashboardControllerProvider);
+
     if (!mounted) {
       return;
     }
-    setState(() => _isAuthenticated = false);
+
+    setState(() {
+      _isAuthenticated = false;
+      _checkingSession = false;
+    });
   }
 }
