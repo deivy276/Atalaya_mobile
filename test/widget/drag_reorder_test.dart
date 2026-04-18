@@ -2,10 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
-    'reorders variables and persists layout order',
+    'supports drag reorder interactions for variable tiles',
     (tester) async {
-      // Placeholder: implementar al introducir modo edición + drag handle.
+      // Placeholder: requiere harness con grid/lista reorderable y payload mock.
     },
-    skip: true, // TODO: habilitar al implementar layout reordenable.
+    skip: true,
   );
 }
