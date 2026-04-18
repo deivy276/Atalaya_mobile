@@ -6,6 +6,6 @@ void main() {
     (tester) async {
       // Placeholder: migrar a integration_test con backend/mock API controlado.
     },
-    skip: true, // TODO: habilitar con entorno de integración.
+    skip: true,
   );
 }
