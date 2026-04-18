@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -193,16 +196,24 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     DashboardViewState viewState,
     DashboardUiModel uiModel,
   ) {
-    if (uiModel.tiles.isEmpty) {
-      return const SliverToBoxAdapter(
-        child: _EmptyKpiState(),
-      );
-    }
+    final width = MediaQuery.of(context).size.width;
+    final horizontalPadding = width >= 1100
+        ? const EdgeInsets.fromLTRB(20, 0, 12, 0)
+        : const EdgeInsets.symmetric(horizontal: 16);
+    final itemCount = uiModel.tiles.length + 1;
 
     Widget buildTileItem(BuildContext context, int index) {
+      if (index == uiModel.tiles.length) {
+        return _SpecialPredictorTile(
+          selected: false,
+          onTap: _openSpecialPredictorScreen,
+        );
+      }
+
       final model = uiModel.tiles[index];
       final variable = viewState.payload.variables.firstWhere(
         (WellVariable item) => item.tag == model.id,
+        orElse: () => WellVariable.empty(index + 1),
       );
 
       return KpiTileV2(
@@ -215,40 +226,46 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         accentColor: model.accentColor,
         onTap: () {
           setState(() => _selectedVariableTag = model.id);
-          _openVariableDetail(variable);
+          _openVariableTrend(variable: variable, tile: model);
         },
       );
     }
 
     if (_tileLayoutMode == _TileLayoutMode.list) {
-      return SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (BuildContext context, int index) => Padding(
-            padding: EdgeInsets.only(
-              bottom: index == uiModel.tiles.length - 1 ? 0 : 12,
+      return SliverPadding(
+        padding: horizontalPadding,
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (BuildContext context, int index) => Padding(
+              padding: EdgeInsets.only(
+                bottom: index == itemCount - 1 ? 0 : 12,
+              ),
+              child: SizedBox(
+                height: 170,
+                child: buildTileItem(context, index),
+              ),
             ),
-            child: SizedBox(
-              height: 170,
-              child: buildTileItem(context, index),
-            ),
+            childCount: itemCount,
           ),
-          childCount: uiModel.tiles.length,
         ),
       );
     }
 
-    final crossAxisCount = _resolveCrossAxisCount(MediaQuery.of(context).size.width);
+    final crossAxisCount = _resolveCrossAxisCount(width);
 
-    return SliverGrid(
-      delegate: SliverChildBuilderDelegate(
-        buildTileItem,
-        childCount: uiModel.tiles.length,
-      ),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: _densityMode == _DensityMode.compact ? 1.28 : 1.12,
+    return SliverPadding(
+      padding: horizontalPadding,
+      sliver: SliverGrid(
+        delegate: SliverChildBuilderDelegate(
+          buildTileItem,
+          childCount: itemCount,
+        ),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: _densityMode == _DensityMode.compact ? 1.28 : 1.12,
+        ),
       ),
     );
   }
@@ -386,7 +403,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       final converted = variable.value == null
           ? null
           : UnitConverter.convertValue(variable.value!, variable.rawUnit, displayUnit);
-      final sparkline = state.variableHistoryByTag[variable.tag] ?? const <double>[];
+      final rawSparkline = state.variableHistoryByTag[variable.tag] ?? const <double>[];
+      final sparkline = rawSparkline
+          .map((value) => UnitConverter.convertValue(value, variable.rawUnit, displayUnit))
+          .toList(growable: false);
       final delta = sparkline.length >= 2
           ? ((sparkline.last - sparkline.first) / (sparkline.first == 0 ? 1 : sparkline.first)) * 100
           : 0.0;
@@ -529,7 +549,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
   Future<void> _openLayoutControls() async {
     final dashboardState = ref.read(dashboardControllerProvider).asData?.value;
-    final currentTileCount = dashboardState?.payload.variables.take(6).length ?? 0;
+    final currentTileCount = (dashboardState?.payload.variables.take(6).length ?? 0) + 1;
     final currentStatus = dashboardState == null
         ? 'Sin datos'
         : (dashboardState.connectionStatus == ConnectionStatus.connected ? 'En línea' : 'Desactualizado');
@@ -681,7 +701,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
-  Future<void> _openVariableDetail(WellVariable variable) async {
+  Future<void> _openVariableTrend({
+    required WellVariable variable,
+    required VariableTileUiModel tile,
+  }) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -689,14 +712,12 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       backgroundColor: Colors.transparent,
       builder: (BuildContext sheetContext) {
         return FractionallySizedBox(
-          heightFactor: 0.94,
+          heightFactor: 0.86,
           child: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: PredictorChartsPanel(
-              embedded: true,
-              initialType: _predictorTypeForVariable(variable),
-              sourceLabel: variable.label,
-              sourceTag: variable.tag,
+            child: _VariableTrendSheet(
+              variable: variable,
+              tile: tile,
             ),
           ),
         );
@@ -704,22 +725,487 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
-  PredictorChartType _predictorTypeForVariable(WellVariable variable) {
-    final signature = '${variable.tag} ${variable.label}'.toLowerCase();
+  Future<void> _openSpecialPredictorScreen() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext sheetContext) {
+        return const FractionallySizedBox(
+          heightFactor: 0.94,
+          child: ClipRRect(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            child: PredictorChartsPanel(
+              embedded: true,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
-    if (signature.contains('torque')) {
-      return PredictorChartType.surfaceTorque;
-    }
+class _VariableTrendSheet extends StatelessWidget {
+  const _VariableTrendSheet({
+    required this.variable,
+    required this.tile,
+  });
 
-    if (signature.contains('pump') || signature.contains('pressure')) {
-      return PredictorChartType.pumpPressure;
-    }
+  final WellVariable variable;
+  final VariableTileUiModel tile;
 
-    if (signature.contains('hook') || signature.contains('load')) {
-      return PredictorChartType.hookLoad;
-    }
+  @override
+  Widget build(BuildContext context) {
+    final series = tile.trendSeries;
+    final hasChart = series.length >= 2;
+    final accentColor = tile.accentColor;
 
-    return PredictorChartType.hookLoad;
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[LayoutTokens.bgPrimary, LayoutTokens.bgSecondary],
+        ),
+      ),
+      child: SafeArea(
+        bottom: true,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: LayoutTokens.textMuted,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          tile.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: LayoutTokens.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          variable.tag.isEmpty ? 'Variable' : 'Tag: ${variable.tag}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: LayoutTokens.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    tooltip: 'Cerrar',
+                    icon: const Icon(Icons.close_rounded, color: LayoutTokens.textSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: LayoutTokens.surfaceCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: LayoutTokens.dividerSubtle),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Expanded(
+                      child: RichText(
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          text: tile.valueText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w700,
+                            height: 1,
+                          ),
+                          children: <InlineSpan>[
+                            TextSpan(
+                              text: tile.unitText.isEmpty ? '' : ' ${tile.unitText}',
+                              style: const TextStyle(
+                                color: LayoutTokens.textSecondary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Text(
+                      tile.deltaText,
+                      style: TextStyle(
+                        color: accentColor,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Gráfica de variable',
+                style: TextStyle(
+                  color: LayoutTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(8, 12, 12, 8),
+                  decoration: BoxDecoration(
+                    color: LayoutTokens.surfaceCard.withValues(alpha: 0.76),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: LayoutTokens.dividerSubtle),
+                  ),
+                  child: hasChart
+                      ? _VariableLineChart(
+                          series: series,
+                          unit: tile.unitText,
+                          color: accentColor,
+                        )
+                      : const _NoVariableChartData(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                hasChart
+                    ? '${series.length} muestras recientes · solo lectura'
+                    : 'Aún no hay suficientes muestras para graficar esta variable.',
+                style: const TextStyle(
+                  color: LayoutTokens.textMuted,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VariableLineChart extends StatelessWidget {
+  const _VariableLineChart({
+    required this.series,
+    required this.unit,
+    required this.color,
+  });
+
+  final List<double> series;
+  final String unit;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final minValue = series.reduce((a, b) => a < b ? a : b);
+    final maxValue = series.reduce((a, b) => a > b ? a : b);
+    final span = (maxValue - minValue).abs();
+    final padding = span < 0.01 ? 1.0 : span * 0.18;
+    final spots = List<FlSpot>.generate(
+      series.length,
+      (int index) => FlSpot(index.toDouble(), series[index]),
+    );
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: (series.length - 1).toDouble(),
+        minY: minValue - padding,
+        maxY: maxValue + padding,
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (_) => const FlLine(
+            color: Color(0x334A6D96),
+            strokeWidth: 1,
+          ),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 24,
+              interval: math.max(1, (series.length / 4).floor()).toDouble(),
+              getTitlesWidget: (value, meta) => Text(
+                value.round().toString(),
+                style: const TextStyle(
+                  color: LayoutTokens.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ),
+          leftTitles: AxisTitles(
+            axisNameWidget: Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                unit.isEmpty ? 'Valor' : unit,
+                style: const TextStyle(
+                  color: LayoutTokens.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 46,
+              getTitlesWidget: (value, meta) => Text(
+                UnitConverter.formatNumber(value),
+                style: const TextStyle(
+                  color: LayoutTokens.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          enabled: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => const Color(0xEE0A162A),
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipItems: (spots) {
+              return spots.map((spot) {
+                final value = UnitConverter.formatNumber(spot.y);
+                return LineTooltipItem(
+                  unit.isEmpty ? value : '$value $unit',
+                  const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                );
+              }).toList(growable: false);
+            },
+          ),
+        ),
+        lineBarsData: <LineChartBarData>[
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            curveSmoothness: 0.24,
+            color: color,
+            barWidth: 2.2,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  color.withValues(alpha: 0.20),
+                  color.withValues(alpha: 0.04),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoVariableChartData extends StatelessWidget {
+  const _NoVariableChartData();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Icon(Icons.show_chart_rounded, color: LayoutTokens.textMuted, size: 34),
+          SizedBox(height: 10),
+          Text(
+            'No hay suficientes datos para graficar',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: LayoutTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'La gráfica se activará cuando llegue más historial.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: LayoutTokens.textMuted,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpecialPredictorTile extends StatelessWidget {
+  const _SpecialPredictorTile({
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = selected ? LayoutTokens.accentBlue : Colors.white12;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Ink(
+        padding: const EdgeInsets.all(LayoutTokens.spacing12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color(0xFF112336),
+              Color(0xFF09233C),
+              Color(0xFF0A1C2F),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: LayoutTokens.accentBlue.withValues(alpha: 0.10),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: LayoutTokens.accentBlue.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: LayoutTokens.accentBlue.withValues(alpha: 0.38)),
+                  ),
+                  child: const Icon(
+                    Icons.auto_graph_rounded,
+                    color: LayoutTokens.accentBlue,
+                    size: 18,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.open_in_new_rounded,
+                  color: LayoutTokens.textSecondary,
+                  size: 18,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Special Predictor Screen',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: LayoutTokens.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.05,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Hook Load · Torque · Pressure',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: LayoutTokens.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const Spacer(),
+            Row(
+              children: <Widget>[
+                _MiniPredictorDot(color: LayoutTokens.accentGreen),
+                const SizedBox(width: 5),
+                _MiniPredictorDot(color: LayoutTokens.accentOrange),
+                const SizedBox(width: 5),
+                _MiniPredictorDot(color: LayoutTokens.accentRed),
+                const Spacer(),
+                const Text(
+                  'Abrir',
+                  style: TextStyle(
+                    color: LayoutTokens.accentBlue,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniPredictorDot extends StatelessWidget {
+  const _MiniPredictorDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
   }
 }
 
@@ -737,9 +1223,9 @@ class _ControlsStatusSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Estado actual $currentStatus con $currentTileCount variables visibles',
+      label: 'Estado actual $currentStatus con $currentTileCount tiles visibles',
       child: Tooltip(
-        message: 'Estado: $currentStatus | Variables visibles: $currentTileCount',
+        message: 'Estado: $currentStatus | Tiles visibles: $currentTileCount',
         child: Row(
           children: <Widget>[
             Icon(
@@ -750,7 +1236,7 @@ class _ControlsStatusSummary extends StatelessWidget {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                'Estado: $currentStatus · Variables: $currentTileCount',
+                'Estado: $currentStatus · Tiles: $currentTileCount',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: LayoutTokens.textMuted),
@@ -795,34 +1281,6 @@ class _SelectedVariableBanner extends StatelessWidget {
           Text(
             tile.deltaText,
             style: TextStyle(color: tile.accentColor, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyKpiState extends StatelessWidget {
-  const _EmptyKpiState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
-      ),
-      child: const Row(
-        children: <Widget>[
-          Icon(Icons.insights_outlined, color: LayoutTokens.textSecondary),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'No hay variables disponibles para esta operación.',
-              style: TextStyle(color: LayoutTokens.textSecondary),
-            ),
           ),
         ],
       ),
