@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/theme/layout_tokens.dart';
+import '../../../core/theme/atalaya_theme.dart';
 import '../../../data/models/alert.dart';
 
 class PredictorAlertsDock extends StatefulWidget {
@@ -31,6 +31,7 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     final alerts = widget.alerts;
     final visibleAlerts = alerts.take(_expanded ? 5 : 1).toList(growable: false);
 
@@ -38,44 +39,51 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
       duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: widget.embedded ? const Color(0xEE0A162A) : const Color(0xEE081427),
+        color: colors.card.withValues(alpha: widget.embedded ? 0.98 : 0.94),
         borderRadius: widget.embedded
             ? BorderRadius.circular(22)
             : const BorderRadius.vertical(top: Radius.circular(22)),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
+        border: Border.all(color: colors.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Predictor KPIs & Alerts',
                   style: TextStyle(
-                    color: LayoutTokens.textPrimary,
-                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w800,
                     fontSize: 15,
                   ),
                 ),
               ),
-              Text('${alerts.length}', style: const TextStyle(color: LayoutTokens.textSecondary)),
+              Text('${alerts.length}', style: TextStyle(color: colors.textSecondary)),
               if (alerts.isNotEmpty)
                 IconButton(
                   onPressed: () => setState(() => _expanded = !_expanded),
                   icon: Icon(
                     _expanded ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-                    color: LayoutTokens.textSecondary,
+                    color: colors.textSecondary,
                   ),
                 ),
             ],
           ),
           if (alerts.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'No hay alertas activas',
-                style: TextStyle(color: LayoutTokens.textMuted),
+                style: TextStyle(color: colors.textMuted),
               ),
             ),
           for (final alert in visibleAlerts)
@@ -83,9 +91,9 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: LayoutTokens.surfaceCard,
+                color: colors.plot,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _severityColor(alert.severity).withValues(alpha: 0.7)),
+                border: Border.all(color: _severityColor(alert.severity, colors).withValues(alpha: 0.72)),
               ),
               child: Row(
                 children: <Widget>[
@@ -95,16 +103,16 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
                       children: <Widget>[
                         Text(
                           'Predictor · ${DateFormat('HH:mm').format(alert.createdAt.toLocal())}',
-                          style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 11),
+                          style: TextStyle(color: colors.textMuted, fontSize: 11),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           alert.description,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LayoutTokens.textPrimary,
-                            fontWeight: FontWeight.w600,
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -123,14 +131,14 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
     );
   }
 
-  Color _severityColor(AlertSeverity severity) {
+  Color _severityColor(AlertSeverity severity, AtalayaThemeColors colors) {
     switch (severity) {
       case AlertSeverity.critical:
-        return LayoutTokens.accentRed;
+        return colors.danger;
       case AlertSeverity.attention:
-        return LayoutTokens.accentOrange;
+        return colors.warning;
       case AlertSeverity.ok:
-        return LayoutTokens.accentBlue;
+        return colors.primary;
     }
   }
 }

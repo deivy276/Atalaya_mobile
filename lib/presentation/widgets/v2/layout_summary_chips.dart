@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/layout_tokens.dart';
+import '../../../core/theme/atalaya_theme.dart';
 
 class LayoutSummaryChips extends StatelessWidget {
   static const double _compactBreakpoint = 420;
@@ -40,7 +40,7 @@ class LayoutSummaryChips extends StatelessWidget {
               _ChipLabel(
                 text: statusText!,
                 icon: Icons.radio_button_checked_rounded,
-                textColor: statusColor ?? LayoutTokens.textSecondary,
+                textColor: statusColor,
                 semanticLabel: 'Estado operativo: $statusText',
               ),
             _ChipLabel(
@@ -60,13 +60,13 @@ class LayoutSummaryChips extends StatelessWidget {
               onTap: onTapLayout,
               semanticLabel: 'Cambiar vista actual: $layoutLabel',
             ),
-        _ChipLabel(
-          text: compact ? 'Reset' : 'Restablecer',
-          icon: Icons.restart_alt_rounded,
-          onTap: onTapReset,
-          semanticLabel: 'Restablecer ajustes de layout',
-          showDisabledHint: true,
-        ),
+            _ChipLabel(
+              text: compact ? 'Reset' : 'Restablecer',
+              icon: Icons.restart_alt_rounded,
+              onTap: onTapReset,
+              semanticLabel: 'Restablecer ajustes de layout',
+              showDisabledHint: true,
+            ),
           ],
         );
       },
@@ -93,6 +93,9 @@ class _ChipLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
+    final foreground = textColor ?? (onTap == null ? colors.textMuted : colors.textSecondary);
+
     return Semantics(
       button: onTap != null,
       enabled: onTap != null,
@@ -108,32 +111,21 @@ class _ChipLabel extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: onTap == null
-                    ? LayoutTokens.surfaceCard.withValues(alpha: 0.6)
-                    : LayoutTokens.surfaceCard,
+                    ? colors.card.withValues(alpha: colors.isDark ? 0.62 : 0.75)
+                    : colors.card,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: LayoutTokens.dividerSubtle),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (icon != null) ...<Widget>[
-                    Icon(
-                      icon,
-                      size: 14,
-                      color: onTap == null
-                          ? (textColor ?? LayoutTokens.textMuted)
-                          : (textColor ?? LayoutTokens.textSecondary),
-                    ),
+                    Icon(icon, size: 14, color: foreground),
                     const SizedBox(width: 6),
                   ],
                   Text(
                     text,
-                    style: TextStyle(
-                      color: onTap == null
-                          ? (textColor ?? LayoutTokens.textMuted)
-                          : (textColor ?? LayoutTokens.textSecondary),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),

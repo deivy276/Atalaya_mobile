@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/atalaya_theme.dart';
 import '../../../core/theme/layout_tokens.dart';
 
 class WellOverviewCard extends StatelessWidget {
@@ -16,16 +17,26 @@ class WellOverviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
+    final statusColor = isActive ? colors.success : colors.warning;
+
     return Container(
       padding: const EdgeInsets.all(LayoutTokens.spacing16),
       decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
+        gradient: colors.cardGradient,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
+        border: Border.all(color: colors.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: colors.isDark ? 16 : 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.oil_barrel_rounded, color: LayoutTokens.textSecondary),
+          Icon(Icons.oil_barrel_rounded, color: colors.textSecondary),
           const SizedBox(width: LayoutTokens.spacing12),
           Expanded(
             child: Column(
@@ -33,16 +44,16 @@ class WellOverviewCard extends StatelessWidget {
               children: <Widget>[
                 Text(
                   well.isEmpty ? 'Well not available' : well,
-                  style: const TextStyle(
-                    color: LayoutTokens.textPrimary,
-                    fontWeight: FontWeight.w700,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w800,
                     fontSize: 18,
                   ),
                 ),
                 const SizedBox(height: LayoutTokens.spacing4),
                 Text(
                   job.isEmpty ? 'No active operation' : job,
-                  style: const TextStyle(color: LayoutTokens.textSecondary, fontSize: 14),
+                  style: TextStyle(color: colors.textSecondary, fontSize: 14),
                 ),
               ],
             ),
@@ -50,15 +61,15 @@ class WellOverviewCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: (isActive ? LayoutTokens.accentGreen : LayoutTokens.accentOrange).withValues(alpha: 0.16),
+              color: statusColor.withValues(alpha: colors.isDark ? 0.16 : 0.10),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: isActive ? LayoutTokens.accentGreen : LayoutTokens.accentOrange),
+              border: Border.all(color: statusColor.withValues(alpha: colors.isDark ? 1 : 0.72)),
             ),
             child: Text(
               isActive ? 'ACTIVE' : 'STALE',
               style: TextStyle(
-                color: isActive ? LayoutTokens.accentGreen : LayoutTokens.accentOrange,
-                fontWeight: FontWeight.w700,
+                color: statusColor,
+                fontWeight: FontWeight.w800,
                 fontSize: 12,
               ),
             ),

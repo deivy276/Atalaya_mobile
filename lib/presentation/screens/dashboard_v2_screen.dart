@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/trend_range.dart';
 import '../../core/theme/layout_tokens.dart';
+import '../../core/theme/atalaya_theme.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/alert.dart';
 import '../../data/models/app_settings.dart';
@@ -65,12 +66,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         onOpenSettings: _openSettingsPanel,
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: <Color>[LayoutTokens.bgPrimary, LayoutTokens.bgSecondary],
-          ),
+        decoration: BoxDecoration(
+          gradient: context.atalayaColors.pageGradient,
         ),
         child: SafeArea(
           child: dashboardAsync.when(
@@ -544,7 +541,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   Future<void> _openAlertDetail(AtalayaAlert alert) async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0A162A),
+      backgroundColor: context.atalayaColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -645,7 +642,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0A162A),
+      backgroundColor: context.atalayaColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1620,31 +1617,35 @@ class _SelectedVariableBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
+        color: colors.card,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
+        border: Border.all(color: colors.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(color: colors.shadow, blurRadius: 12, offset: const Offset(0, 6)),
+        ],
       ),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.analytics_rounded, color: LayoutTokens.textSecondary),
+          Icon(Icons.analytics_rounded, color: colors.textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '${tile.label}: ${tile.valueText} ${tile.unitText}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: LayoutTokens.textPrimary,
-                fontWeight: FontWeight.w600,
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
           Text(
             tile.deltaText,
-            style: TextStyle(color: tile.accentColor, fontWeight: FontWeight.w700),
+            style: TextStyle(color: tile.accentColor, fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -1652,8 +1653,37 @@ class _SelectedVariableBanner extends StatelessWidget {
   }
 }
 
+class _EmptyKpiState extends StatelessWidget {
+  const _EmptyKpiState();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.insights_outlined, color: colors.textSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'No hay variables disponibles para esta operaciÃ³n.',
+              style: TextStyle(color: colors.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }
+
 
 

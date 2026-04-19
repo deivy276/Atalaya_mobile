@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/atalaya_theme.dart';
 import '../../../core/theme/layout_tokens.dart';
 
 class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
@@ -14,11 +15,10 @@ class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onRefresh;
   final VoidCallback? onOpenSettings;
 
-  // Kept for backward compatibility with older DashboardV2Screen revisions.
+  // Backward compatibility with older DashboardV2Screen revisions.
   final VoidCallback? onOpenMenu;
 
-  // Logout is intentionally not rendered in the AppBar anymore.
-  // It is exposed from the Settings panel to avoid accidental taps in field operation.
+  // Logout intentionally remains inside Settings to reduce accidental taps.
   final VoidCallback? onLogout;
 
   @override
@@ -26,26 +26,29 @@ class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     final settingsCallback = onOpenSettings ?? onOpenMenu;
 
     return AppBar(
-      backgroundColor: Colors.transparent,
+      backgroundColor: colors.background,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       titleSpacing: LayoutTokens.spacing16,
-      title: const Row(
+      title: Row(
         children: <Widget>[
-          Image(
+          const Image(
             image: AssetImage('assets/Atalaya.png'),
             height: 24,
             fit: BoxFit.contain,
           ),
-          SizedBox(width: LayoutTokens.spacing8),
+          const SizedBox(width: LayoutTokens.spacing8),
           Text(
             'Atalaya Mobile',
             style: TextStyle(
-              color: LayoutTokens.textPrimary,
-              fontWeight: FontWeight.w700,
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w800,
               fontSize: 20,
+              letterSpacing: -0.2,
             ),
           ),
         ],
@@ -55,13 +58,13 @@ class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
           IconButton(
             tooltip: 'Actualizar',
             onPressed: onRefresh,
-            icon: const Icon(Icons.refresh_rounded, color: LayoutTokens.textPrimary),
+            icon: Icon(Icons.refresh_rounded, color: colors.textPrimary),
           ),
         if (settingsCallback != null)
           IconButton(
             tooltip: 'Configuración',
             onPressed: settingsCallback,
-            icon: const Icon(Icons.settings_rounded, color: LayoutTokens.textPrimary),
+            icon: Icon(Icons.settings_rounded, color: colors.textPrimary),
           ),
       ],
     );

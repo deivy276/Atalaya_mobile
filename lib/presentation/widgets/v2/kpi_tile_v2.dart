@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/atalaya_theme.dart';
 
 class KpiTileV2 extends StatelessWidget {
   const KpiTileV2({
@@ -26,44 +27,34 @@ class KpiTileV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trendColor = accentColor ?? const Color(0xFF5FDE92);
+    final colors = context.atalayaColors;
+    final trendColor = accentColor ?? colors.success;
     final deltaValue = _parseDeltaValue(delta);
-    final deltaColor = deltaValue >= 0 ? trendColor : const Color(0xFFFFA65B);
-    final borderColor = selected
-        ? trendColor.withValues(alpha: 0.78)
-        : const Color(0xFF1C3650);
+    final deltaColor = deltaValue >= 0 ? colors.success : colors.warning;
+    final borderColor = selected ? trendColor.withValues(alpha: 0.9) : colors.border;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: borderColor),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                Color(0xFF0B1A28),
-                Color(0xFF0A2233),
-                Color(0xFF0B2941),
-              ],
-            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor, width: selected ? 1.2 : 1),
+            gradient: colors.cardGradient,
             boxShadow: <BoxShadow>[
               BoxShadow(
                 color: selected
-                    ? trendColor.withValues(alpha: 0.16)
-                    : const Color(0xFF02111E).withValues(alpha: 0.28),
+                    ? trendColor.withValues(alpha: colors.isDark ? 0.20 : 0.12)
+                    : colors.shadow,
                 blurRadius: selected ? 18 : 12,
-                spreadRadius: 0,
-                offset: const Offset(0, 6),
+                offset: const Offset(0, 7),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -71,15 +62,15 @@ class KpiTileV2 extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFDDE8F5),
+                  style: TextStyle(
+                    color: colors.textPrimary,
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.08,
                     height: 1.0,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
@@ -87,20 +78,20 @@ class KpiTileV2 extends StatelessWidget {
                     maxLines: 1,
                     text: TextSpan(
                       text: value,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.textPrimary,
                         fontSize: 40,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         height: 0.96,
-                        letterSpacing: -0.5,
+                        letterSpacing: -0.8,
                       ),
                       children: <InlineSpan>[
                         TextSpan(
-                          text: ' $unit',
-                          style: const TextStyle(
-                            color: Color(0xFFB6C3D2),
+                          text: unit.trim().isEmpty ? '' : ' $unit',
+                          style: TextStyle(
+                            color: colors.textSecondary,
                             fontSize: 17,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: FontWeight.w500,
                             letterSpacing: 0,
                           ),
                         ),
@@ -110,7 +101,7 @@ class KpiTileV2 extends StatelessWidget {
                 ),
                 const Spacer(),
                 SizedBox(
-                  height: 34,
+                  height: 36,
                   width: double.infinity,
                   child: sparkline.length < 2
                       ? const SizedBox.shrink()
@@ -129,8 +120,8 @@ class KpiTileV2 extends StatelessWidget {
                     style: TextStyle(
                       color: deltaColor,
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.08,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.04,
                       height: 1.0,
                     ),
                   ),
@@ -197,7 +188,7 @@ class _Sparkline extends StatelessWidget {
             isCurved: true,
             curveSmoothness: 0.24,
             color: color,
-            barWidth: 1.5,
+            barWidth: 1.7,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
@@ -207,7 +198,7 @@ class _Sparkline extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: <Color>[
                   color.withValues(alpha: 0.18),
-                  color.withValues(alpha: 0.04),
+                  color.withValues(alpha: 0.05),
                   Colors.transparent,
                 ],
               ),
