@@ -326,6 +326,7 @@ class _SettingsSection extends StatelessWidget {
   }
 }
 
+
 class _ThemePreferenceSelector extends StatelessWidget {
   const _ThemePreferenceSelector({
     required this.selected,
@@ -337,7 +338,7 @@ class _ThemePreferenceSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visual = Theme.of(context).extension<AtalayaVisualPalette>() ?? AtalayaVisualPalette.dark;
+    final visual = context.atalayaColors;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -350,18 +351,16 @@ class _ThemePreferenceSelector extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Selecciona la paleta de operación. Sistema aplica automáticamente oscuro o claro según Android/iOS.',
+            'Oscuro para operación continua, Claro para alta luminosidad y Sistema para seguir Android/iOS.',
             style: TextStyle(color: visual.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 12),
-          Column(
-            children: AtalayaThemePreference.values.map((item) {
-              return _ThemePreferenceTile(
-                preference: item,
-                selected: selected == item,
-                onTap: () => onChanged(item),
-              );
-            }).toList(growable: false),
+          ...AtalayaThemePreference.values.map(
+            (item) => _ThemePreferenceTile(
+              preference: item,
+              selected: selected == item,
+              onTap: () => onChanged(item),
+            ),
           ),
         ],
       ),
@@ -382,7 +381,7 @@ class _ThemePreferenceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current = Theme.of(context).extension<AtalayaVisualPalette>() ?? AtalayaVisualPalette.dark;
+    final current = context.atalayaColors;
     final preview = switch (preference) {
       AtalayaThemePreference.dark => AtalayaVisualPalette.dark,
       AtalayaThemePreference.light => AtalayaVisualPalette.light,
@@ -485,13 +484,13 @@ class _ThemePreviewSwatch extends StatelessWidget {
           const Spacer(),
           Row(
             children: <Widget>[
-              _SwatchDot(color: palette.primary),
+              _SwatchDot(color: palette.curvePrimary),
               const SizedBox(width: 4),
               _SwatchDot(color: palette.curveSecondaryA),
               const SizedBox(width: 4),
               _SwatchDot(color: palette.curveSecondaryB),
               const Spacer(),
-              _SwatchDot(color: palette.scatter.withValues(alpha: 0.60), size: 8),
+              _SwatchDot(color: palette.scatter, size: 8),
             ],
           ),
         ],

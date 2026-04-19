@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 @immutable
 class AtalayaVisualPalette extends ThemeExtension<AtalayaVisualPalette> {
   const AtalayaVisualPalette({
+    required this.brightness,
     required this.background,
     required this.card,
     required this.plotArea,
@@ -10,11 +11,14 @@ class AtalayaVisualPalette extends ThemeExtension<AtalayaVisualPalette> {
     required this.textPrimary,
     required this.textSecondary,
     required this.primary,
+    required this.curvePrimary,
     required this.curveSecondaryA,
     required this.curveSecondaryB,
     required this.scatter,
+    required this.safe,
   });
 
+  final Brightness brightness;
   final Color background;
   final Color card;
   final Color plotArea;
@@ -22,38 +26,47 @@ class AtalayaVisualPalette extends ThemeExtension<AtalayaVisualPalette> {
   final Color textPrimary;
   final Color textSecondary;
   final Color primary;
+  final Color curvePrimary;
   final Color curveSecondaryA;
   final Color curveSecondaryB;
   final Color scatter;
+  final Color safe;
 
   static const AtalayaVisualPalette dark = AtalayaVisualPalette(
-    background: Color(0xFF0F172A),
-    card: Color(0xFF1E293B),
-    plotArea: Color(0xFF0B1120),
+    brightness: Brightness.dark,
+    background: Color(0xFF0B132B),
+    card: Color(0xFF1C2541),
+    plotArea: Color(0xFF0F172A),
     grid: Color(0x4D334155),
-    textPrimary: Color(0xFFF1F5F9),
+    textPrimary: Color(0xFFF8FAFC),
     textSecondary: Color(0xFF94A3B8),
-    primary: Color(0xFF00E5FF),
-    curveSecondaryA: Color(0xFFA855F7),
-    curveSecondaryB: Color(0xFFF97316),
-    scatter: Color(0x99F43F5E),
+    primary: Color(0xFF06B6D4),
+    curvePrimary: Color(0xFF3B82F6),
+    curveSecondaryA: Color(0xFF8B5CF6),
+    curveSecondaryB: Color(0xFFF59E0B),
+    scatter: Color(0x99EF4444),
+    safe: Color(0xFF10B981),
   );
 
   static const AtalayaVisualPalette light = AtalayaVisualPalette(
+    brightness: Brightness.light,
     background: Color(0xFFF8FAFC),
     card: Color(0xFFFFFFFF),
     plotArea: Color(0xFFF1F5F9),
     grid: Color(0xFFE2E8F0),
     textPrimary: Color(0xFF0F172A),
     textSecondary: Color(0xFF64748B),
-    primary: Color(0xFF0891B2),
-    curveSecondaryA: Color(0xFF7E22CE),
-    curveSecondaryB: Color(0xFFC2410C),
-    scatter: Color(0x99E11D48),
+    primary: Color(0xFF0284C7),
+    curvePrimary: Color(0xFF3B82F6),
+    curveSecondaryA: Color(0xFF8B5CF6),
+    curveSecondaryB: Color(0xFFF59E0B),
+    scatter: Color(0x99EF4444),
+    safe: Color(0xFF10B981),
   );
 
   @override
   AtalayaVisualPalette copyWith({
+    Brightness? brightness,
     Color? background,
     Color? card,
     Color? plotArea,
@@ -61,11 +74,14 @@ class AtalayaVisualPalette extends ThemeExtension<AtalayaVisualPalette> {
     Color? textPrimary,
     Color? textSecondary,
     Color? primary,
+    Color? curvePrimary,
     Color? curveSecondaryA,
     Color? curveSecondaryB,
     Color? scatter,
+    Color? safe,
   }) {
     return AtalayaVisualPalette(
+      brightness: brightness ?? this.brightness,
       background: background ?? this.background,
       card: card ?? this.card,
       plotArea: plotArea ?? this.plotArea,
@@ -73,19 +89,20 @@ class AtalayaVisualPalette extends ThemeExtension<AtalayaVisualPalette> {
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       primary: primary ?? this.primary,
+      curvePrimary: curvePrimary ?? this.curvePrimary,
       curveSecondaryA: curveSecondaryA ?? this.curveSecondaryA,
       curveSecondaryB: curveSecondaryB ?? this.curveSecondaryB,
       scatter: scatter ?? this.scatter,
+      safe: safe ?? this.safe,
     );
   }
 
   @override
   AtalayaVisualPalette lerp(ThemeExtension<AtalayaVisualPalette>? other, double t) {
-    if (other is! AtalayaVisualPalette) {
-      return this;
-    }
+    if (other is! AtalayaVisualPalette) return this;
 
     return AtalayaVisualPalette(
+      brightness: t < 0.5 ? brightness : other.brightness,
       background: Color.lerp(background, other.background, t) ?? background,
       card: Color.lerp(card, other.card, t) ?? card,
       plotArea: Color.lerp(plotArea, other.plotArea, t) ?? plotArea,
@@ -93,9 +110,11 @@ class AtalayaVisualPalette extends ThemeExtension<AtalayaVisualPalette> {
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t) ?? textPrimary,
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t) ?? textSecondary,
       primary: Color.lerp(primary, other.primary, t) ?? primary,
+      curvePrimary: Color.lerp(curvePrimary, other.curvePrimary, t) ?? curvePrimary,
       curveSecondaryA: Color.lerp(curveSecondaryA, other.curveSecondaryA, t) ?? curveSecondaryA,
       curveSecondaryB: Color.lerp(curveSecondaryB, other.curveSecondaryB, t) ?? curveSecondaryB,
       scatter: Color.lerp(scatter, other.scatter, t) ?? scatter,
+      safe: Color.lerp(safe, other.safe, t) ?? safe,
     );
   }
 }
@@ -103,134 +122,112 @@ class AtalayaVisualPalette extends ThemeExtension<AtalayaVisualPalette> {
 class ProPalette {
   const ProPalette._();
 
-  // Dark palette: midnight blues and muted grays for field operations.
-  static const Color bg = Color(0xFF0F172A);
-  static const Color panel = Color(0xFF0B1120);
-  static const Color card = Color(0xFF1E293B);
+  // Backwards-compatible aliases used by legacy widgets.
+  static const Color bg = Color(0xFF0B132B);
+  static const Color panel = Color(0xFF0F172A);
+  static const Color card = Color(0xFF1C2541);
   static const Color stroke = Color(0x4D334155);
-  static const Color text = Color(0xFFF1F5F9);
+  static const Color text = Color(0xFFF8FAFC);
   static const Color muted = Color(0xFF94A3B8);
-  static const Color accent = Color(0xFF00E5FF);
-  static const Color ok = Color(0xFF22C55E);
-  static const Color warn = Color(0xFFF97316);
-  static const Color danger = Color(0xFFF43F5E);
-  static const Color chipBg = Color(0xFF0B1120);
+  static const Color accent = Color(0xFF06B6D4);
+  static const Color ok = Color(0xFF10B981);
+  static const Color warn = Color(0xFFF59E0B);
+  static const Color danger = Color(0xFFEF4444);
+  static const Color chipBg = Color(0xFF0F172A);
   static const Color overlay = Color(0xAA000000);
 
-  // Light palette: cool neutrals with engineering contrast.
-  static const Color lightBg = Color(0xFFF8FAFC);
-  static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightPlot = Color(0xFFF1F5F9);
-  static const Color lightGrid = Color(0xFFE2E8F0);
-  static const Color lightText = Color(0xFF0F172A);
-  static const Color lightMuted = Color(0xFF64748B);
-  static const Color lightAccent = Color(0xFF0891B2);
-  static const Color lightWarn = Color(0xFFC2410C);
-  static const Color lightDanger = Color(0xFFE11D48);
+  // Data colors.
+  static const Color curveBlue = Color(0xFF3B82F6);
+  static const Color curvePurple = Color(0xFF8B5CF6);
+  static const Color curveAmber = Color(0xFFF59E0B);
+  static const Color scatterReal = Color(0xFFEF4444);
 
   static ThemeData themeData() => darkThemeData();
 
-  static ThemeData darkThemeData() {
-    const colors = AtalayaVisualPalette.dark;
+  static ThemeData darkThemeData() => _baseTheme(AtalayaVisualPalette.dark);
+
+  static ThemeData lightThemeData() => _baseTheme(AtalayaVisualPalette.light);
+
+  static ThemeData _baseTheme(AtalayaVisualPalette colors) {
+    final isDark = colors.brightness == Brightness.dark;
     final scheme = ColorScheme.fromSeed(
       seedColor: colors.primary,
-      brightness: Brightness.dark,
+      brightness: colors.brightness,
       surface: colors.card,
       primary: colors.primary,
-      secondary: colors.curveSecondaryB,
-      error: const Color(0xFFF43F5E),
+      secondary: colors.curveSecondaryA,
+      tertiary: colors.curveSecondaryB,
+      error: const Color(0xFFEF4444),
       onSurface: colors.textPrimary,
-      onPrimary: const Color(0xFF020617),
+      onPrimary: isDark ? const Color(0xFF020617) : Colors.white,
     );
-
-    return _baseTheme(
-      brightness: Brightness.dark,
-      colors: colors,
-      scheme: scheme,
-      scaffoldBackgroundColor: colors.background,
-      cardColor: colors.card,
-      inputFillColor: colors.plotArea,
-      appBarForeground: colors.textPrimary,
-      buttonForeground: const Color(0xFF020617),
-    );
-  }
-
-  static ThemeData lightThemeData() {
-    const colors = AtalayaVisualPalette.light;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: colors.primary,
-      brightness: Brightness.light,
-      surface: colors.card,
-      primary: colors.primary,
-      secondary: colors.curveSecondaryB,
-      error: const Color(0xFFE11D48),
-      onSurface: colors.textPrimary,
-      onPrimary: Colors.white,
-    );
-
-    return _baseTheme(
-      brightness: Brightness.light,
-      colors: colors,
-      scheme: scheme,
-      scaffoldBackgroundColor: colors.background,
-      cardColor: colors.card,
-      inputFillColor: colors.plotArea,
-      appBarForeground: colors.textPrimary,
-      buttonForeground: Colors.white,
-    );
-  }
-
-  static ThemeData _baseTheme({
-    required Brightness brightness,
-    required AtalayaVisualPalette colors,
-    required ColorScheme scheme,
-    required Color scaffoldBackgroundColor,
-    required Color cardColor,
-    required Color inputFillColor,
-    required Color appBarForeground,
-    required Color buttonForeground,
-  }) {
-    final isDark = brightness == Brightness.dark;
 
     return ThemeData(
       useMaterial3: true,
-      brightness: brightness,
+      brightness: colors.brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scaffoldBackgroundColor,
-      canvasColor: scaffoldBackgroundColor,
-      cardColor: cardColor,
+      scaffoldBackgroundColor: colors.background,
+      canvasColor: colors.background,
+      cardColor: colors.card,
       dividerColor: colors.grid,
-      extensions: const <ThemeExtension<dynamic>>[
-        AtalayaVisualPalette.dark,
-        AtalayaVisualPalette.light,
-      ].whereType<AtalayaVisualPalette>().where((palette) => palette.background == colors.background).toList(),
+      extensions: <ThemeExtension<dynamic>>[colors],
       appBarTheme: AppBarTheme(
-        backgroundColor: scaffoldBackgroundColor,
-        foregroundColor: appBarForeground,
+        backgroundColor: colors.background,
+        foregroundColor: colors.textPrimary,
         elevation: 0,
         centerTitle: false,
         surfaceTintColor: Colors.transparent,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: cardColor,
+        backgroundColor: colors.card,
+        modalBackgroundColor: colors.card,
         surfaceTintColor: Colors.transparent,
-        modalBackgroundColor: cardColor,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: colors.card,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+          color: colors.textPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+        contentTextStyle: TextStyle(color: colors.textSecondary),
+      ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? cardColor : const Color(0xFF0F172A),
-        contentTextStyle: TextStyle(color: isDark ? colors.textPrimary : Colors.white),
+        backgroundColor: isDark ? colors.card : const Color(0xFF0F172A),
+        contentTextStyle: const TextStyle(color: Color(0xFFF8FAFC)),
         behavior: SnackBarBehavior.floating,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: inputFillColor,
-        selectedColor: colors.primary.withValues(alpha: isDark ? 0.20 : 0.16),
+        backgroundColor: colors.plotArea,
+        selectedColor: colors.primary.withValues(alpha: isDark ? 0.22 : 0.16),
+        disabledColor: colors.grid.withValues(alpha: 0.22),
+        side: BorderSide(color: colors.grid),
         labelStyle: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w700),
         secondaryLabelStyle: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800),
-        side: BorderSide(color: colors.grid),
+        iconTheme: IconThemeData(color: colors.textSecondary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            return states.contains(WidgetState.selected) ? colors.textPrimary : colors.textSecondary;
+          }),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            return states.contains(WidgetState.selected)
+                ? colors.primary.withValues(alpha: isDark ? 0.18 : 0.12)
+                : colors.plotArea;
+          }),
+          side: WidgetStateProperty.resolveWith((states) {
+            return BorderSide(
+              color: states.contains(WidgetState.selected) ? colors.primary : colors.grid,
+              width: states.contains(WidgetState.selected) ? 1.2 : 1,
+            );
+          }),
+        ),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
@@ -242,7 +239,7 @@ class ProPalette {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: inputFillColor,
+        fillColor: isDark ? colors.plotArea : colors.card,
         labelStyle: TextStyle(color: colors.textSecondary),
         hintStyle: TextStyle(color: colors.textSecondary.withValues(alpha: 0.78)),
         border: OutlineInputBorder(
@@ -255,32 +252,15 @@ class ProPalette {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: colors.primary, width: 1.2),
+          borderSide: BorderSide(color: colors.primary, width: 1.3),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: colors.primary,
-          foregroundColor: buttonForeground,
+          foregroundColor: isDark ? const Color(0xFF020617) : Colors.white,
           textStyle: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.08),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        ),
-      ),
-      segmentedButtonTheme: SegmentedButtonThemeData(
-        style: ButtonStyle(
-          foregroundColor: WidgetStateProperty.resolveWith((states) {
-            return states.contains(WidgetState.selected) ? colors.textPrimary : colors.textSecondary;
-          }),
-          backgroundColor: WidgetStateProperty.resolveWith((states) {
-            return states.contains(WidgetState.selected)
-                ? colors.primary.withValues(alpha: isDark ? 0.18 : 0.12)
-                : inputFillColor;
-          }),
-          side: WidgetStateProperty.resolveWith((states) {
-            return BorderSide(
-              color: states.contains(WidgetState.selected) ? colors.primary : colors.grid,
-            );
-          }),
         ),
       ),
       textTheme: TextTheme(
@@ -297,9 +277,14 @@ class ProPalette {
         bodyMedium: TextStyle(color: colors.textPrimary),
         bodySmall: TextStyle(color: colors.textSecondary),
         labelLarge: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700),
-        labelMedium: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w700),
-        labelSmall: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w700),
+        labelMedium: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w600),
+        labelSmall: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w600),
       ),
     );
   }
+}
+
+extension AtalayaThemeContext on BuildContext {
+  AtalayaVisualPalette get atalayaColors =>
+      Theme.of(this).extension<AtalayaVisualPalette>() ?? AtalayaVisualPalette.dark;
 }

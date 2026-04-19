@@ -14,7 +14,7 @@ enum AtalayaThemePreference {
   ),
   light(
     'Claro',
-    'Grises neutros de alto contraste para ambientes iluminados.',
+    'Grises técnicos de alto contraste para alta luminosidad.',
     Icons.light_mode_rounded,
   );
 

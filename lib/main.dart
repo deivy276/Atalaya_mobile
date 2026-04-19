@@ -21,7 +21,7 @@ class MyApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       title: 'Atalaya Mobile',
       theme: ProPalette.lightThemeData(),
-      darkTheme: ProPalette.darkThemeData(),
+      darkTheme: ProPalette.themeData(),
       themeMode: settings.themePreference.themeMode,
       home: const AuthGateScreen(),
     );
