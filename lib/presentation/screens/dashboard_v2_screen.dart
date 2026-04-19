@@ -11,6 +11,7 @@ import '../../core/constants/trend_range.dart';
 import '../../core/theme/layout_tokens.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/alert.dart';
+import '../../data/models/app_settings.dart';
 import '../../data/models/trend_point.dart';
 import '../../data/models/well_variable.dart';
 import '../models/dashboard_ui_model.dart';
@@ -1654,4 +1655,5 @@ class _SelectedVariableBanner extends StatelessWidget {
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }
+
 
