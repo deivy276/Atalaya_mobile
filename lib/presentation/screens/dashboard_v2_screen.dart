@@ -1268,6 +1268,47 @@ class _VariableTimeLineChart extends StatelessWidget {
   }
 }
 
+class _NoVariableChartData extends StatelessWidget {
+  const _NoVariableChartData();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.show_chart_rounded,
+              color: LayoutTokens.textMuted,
+              size: 34,
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Sin datos suficientes para este rango.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: LayoutTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Prueba otro rango de tiempo o espera nuevas muestras.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: LayoutTokens.textMuted,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _VariableChartError extends StatelessWidget {
   const _VariableChartError({
     required this.message,
