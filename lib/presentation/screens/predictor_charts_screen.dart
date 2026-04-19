@@ -176,7 +176,6 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
                 children: const <Widget>[
                   _StatusBadge(label: 'Solo lectura', icon: Icons.lock_outline_rounded),
                   _StatusBadge(label: 'API Predictor', icon: Icons.hub_outlined),
-                  _StatusBadge(label: 'Mock fallback', icon: Icons.science_outlined),
                 ],
               ),
               const SizedBox(height: 14),
@@ -286,7 +285,7 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
           points: points,
           color: color ?? _seriesPalette[colorIndex++ % _seriesPalette.length],
           dashed: dashed,
-          width: dashed ? 1.4 : 1.9,
+          width: dashed ? 1.6 : 2.4,
         ),
       );
     }
@@ -481,7 +480,27 @@ class _SpecialPredictorChart extends StatelessWidget {
                 minY: -data.maxDepth,
                 maxY: -data.minDepth,
                 borderData: FlBorderData(show: false),
-                lineTouchData: const LineTouchData(enabled: true),
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipItems: (spots) {
+                      return spots.map((spot) {
+                        final depth = (-spot.y).toStringAsFixed(0);
+                        final value = spot.x.toStringAsFixed(data.type == PredictorChartType.pumpPressure ? 0 : 1);
+                        return LineTooltipItem(
+                          '$value ${data.type.unit}\nMD $depth m',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        );
+                      }).toList(growable: false);
+                    },
+                  ),
+                ),
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: true,
@@ -544,37 +563,63 @@ class _SpecialPredictorChart extends StatelessWidget {
                       curveSmoothness: 0.20,
                       color: series.color,
                       barWidth: series.width,
+                      isStrokeCapRound: true,
                       dashArray: series.dashed ? const <int>[6, 5] : null,
                       dotData: const FlDotData(show: false),
                     ),
                   ),
-                  ...data.fieldPoints.map(
-                    (point) => LineChartBarData(
-                      spots: <FlSpot>[point],
+                  if (data.fieldPoints.isNotEmpty)
+                    LineChartBarData(
+                      spots: data.fieldPoints,
                       isCurved: false,
-                      color: LayoutTokens.accentRed,
+                      color: Colors.transparent,
                       barWidth: 0,
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                          radius: 3,
+                          radius: 4.8,
                           color: LayoutTokens.accentRed,
-                          strokeWidth: 0,
+                          strokeWidth: 1.6,
+                          strokeColor: Colors.white,
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
         ),
         const SizedBox(height: 10),
-        Text(
-          '${data.source} · ${data.series.length} series · ${data.fieldPoints.length} puntos de campo'
-          '${data.note == null ? '' : ' · ${data.note}'}',
-          style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            _MiniStatusPill(
+              label: data.isFallback ? 'Fallback' : 'Datos reales',
+              icon: data.isFallback ? Icons.science_outlined : Icons.check_circle_outline_rounded,
+              color: data.isFallback ? LayoutTokens.accentOrange : LayoutTokens.accentGreen,
+            ),
+            _MiniStatusPill(
+              label: '${data.fieldPoints.length} puntos',
+              icon: Icons.scatter_plot_rounded,
+              color: LayoutTokens.accentRed,
+            ),
+            _MiniStatusPill(
+              label: '${data.series.length} curvas',
+              icon: Icons.show_chart_rounded,
+              color: const Color(0xFF3FA7FF),
+            ),
+          ],
         ),
+        if (data.note != null) ...<Widget>[
+          const SizedBox(height: 6),
+          Text(
+            data.note!,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 12),
+          ),
+        ],
       ],
     );
   }
@@ -635,6 +680,46 @@ class _Legend extends StatelessWidget {
                 Text('Field data', style: TextStyle(color: LayoutTokens.textMuted, fontSize: 11)),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _MiniStatusPill extends StatelessWidget {
+  const _MiniStatusPill({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.55)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -782,6 +867,8 @@ class _SpecialPredictorChartData {
   final PredictorChartType type;
   final String source;
   final String? note;
+
+  bool get isFallback => source.toLowerCase().contains('fallback') || (note ?? '').toLowerCase().contains('fallback');
   final List<_SpecialPredictorSeries> series;
   final List<FlSpot> fieldPoints;
   final double minX;
