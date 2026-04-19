@@ -252,19 +252,17 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
 
       final payload = _asMap(response.data);
       if (payload == null) {
-        return _buildFallbackChartData(type, note: 'Respuesta no JSON; usando fallback local.');
+        return _buildFallbackChartData(
+          type,
+          note: 'Respuesta no JSON. No se dibujan curvas sintéticas.',
+        );
       }
 
-      final parsed = _parseChartPayload(type, payload);
-      if (parsed.series.isEmpty && parsed.fieldPoints.isEmpty) {
-        return _buildFallbackChartData(type, note: 'API sin series visibles; usando fallback local.');
-      }
-
-      return parsed;
+      return _parseChartPayload(type, payload);
     } catch (error) {
       return _buildFallbackChartData(
         type,
-        note: 'API predictor no disponible; usando fallback local.',
+        note: 'API predictor no disponible. No se dibujan curvas sintéticas.',
       );
     }
   }
@@ -281,59 +279,102 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
       if (points.isEmpty) return;
       series.add(
         _SpecialPredictorSeries(
-          name: name,
+          name: _compactSeriesName(name),
           points: points,
           color: color ?? _seriesPalette[colorIndex++ % _seriesPalette.length],
           dashed: dashed,
-          width: dashed ? 1.6 : 2.4,
+          width: dashed ? 1.4 : 2.0,
         ),
       );
     }
 
-    final rawSeries = _asList(data['series']) ?? _asList(data['lines']);
-    if (rawSeries != null) {
-      for (final item in rawSeries) {
-        final map = _asMap(item);
-        if (map == null) continue;
-        final points = _parsePoints(map['points'] ?? map['data']);
-        addSeries(
-          (map['name'] ?? map['label'] ?? 'Serie ${series.length + 1}').toString(),
-          points,
-          dashed: _asBool(map['dashed']) ?? false,
-        );
+    final shouldRenderCurves = _shouldRenderAuthoritativeCurves(data, payload);
+    if (shouldRenderCurves) {
+      final rawSeries = _asList(data['series']) ?? _asList(data['lines']);
+      if (rawSeries != null) {
+        for (final item in rawSeries) {
+          final map = _asMap(item);
+          if (map == null) continue;
+          final points = _parsePoints(map['points'] ?? map['data']);
+          addSeries(
+            (map['name'] ?? map['label'] ?? 'Serie ${series.length + 1}').toString(),
+            points,
+            dashed: _asBool(map['dashed']) ?? false,
+          );
+        }
       }
-    }
 
-    final rawEnvelopes = _asList(data['envelopes']);
-    if (rawEnvelopes != null) {
-      for (var index = 0; index < rawEnvelopes.length; index++) {
-        final item = rawEnvelopes[index];
-        final map = _asMap(item);
-        final points = map == null ? _parsePoints(item) : _parsePoints(map['points'] ?? map['data']);
-        addSeries(
-          map == null ? 'Envelope ${index + 1}' : (map['name'] ?? map['label'] ?? 'Envelope ${index + 1}').toString(),
-          points,
-        );
+      final rawEnvelopes = _asList(data['envelopes']);
+      if (rawEnvelopes != null) {
+        for (var index = 0; index < rawEnvelopes.length; index++) {
+          final item = rawEnvelopes[index];
+          final map = _asMap(item);
+          final points = map == null ? _parsePoints(item) : _parsePoints(map['points'] ?? map['data']);
+          addSeries(
+            map == null
+                ? 'Envelope ${index + 1}'
+                : (map['name'] ?? map['label'] ?? 'Envelope ${index + 1}').toString(),
+            points,
+          );
+        }
       }
+
+      final warnLine = _parsePoints(data['warnLine'] ?? data['warn_line']);
+      addSeries('Warn', warnLine, dashed: true, color: LayoutTokens.accentOrange);
+
+      final criticalLine = _parsePoints(data['criticalLine'] ?? data['critical_line'] ?? data['critLine']);
+      addSeries('Crit', criticalLine, dashed: true, color: LayoutTokens.accentRed);
     }
-
-    final warnLine = _parsePoints(data['warnLine'] ?? data['warn_line']);
-    addSeries('Warn', warnLine, dashed: true, color: LayoutTokens.accentOrange);
-
-    final criticalLine = _parsePoints(data['criticalLine'] ?? data['critical_line'] ?? data['critLine']);
-    addSeries('Crit', criticalLine, dashed: true, color: LayoutTokens.accentRed);
 
     final fieldPoints = _parsePoints(
       data['fieldPoints'] ?? data['field_points'] ?? data['fieldData'] ?? data['field_data'],
     );
 
+    final source = (data['source'] ?? payload['source'] ?? 'Atalaya-Predictor').toString();
+    final note = data['note']?.toString() ??
+        (shouldRenderCurves
+            ? null
+            : 'Mostrando datos reales de campo. Curvas ocultas hasta recibir curvas oficiales de Atalaya-Predictor.');
+
     return _SpecialPredictorChartData.fromSeries(
       type: type,
-      source: (data['source'] ?? payload['source'] ?? 'Atalaya-Predictor').toString(),
-      note: data['note']?.toString(),
+      source: source,
+      note: note,
       series: series,
-      fieldPoints: fieldPoints.take(120).toList(growable: false),
+      fieldPoints: fieldPoints.take(180).toList(growable: false),
     );
+  }
+
+  bool _shouldRenderAuthoritativeCurves(
+    Map<String, dynamic> data,
+    Map<String, dynamic> rootPayload,
+  ) {
+    final explicit = _asBool(data['curvesAreAuthoritative'] ?? rootPayload['curvesAreAuthoritative']);
+    if (explicit == true) return true;
+
+    final source = '${data['seriesSource'] ?? rootPayload['seriesSource'] ?? ''}'.toLowerCase().trim();
+    return source == 'atalaya-predictor' ||
+        source == 'atalaya-predictor-web' ||
+        source == 'predictor-web' ||
+        source == 'web-figure';
+  }
+
+  String _compactSeriesName(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return 'Serie';
+    final lower = text.toLowerCase();
+    final pickup = RegExp(r'pickup[-_\s]*ff?[-_\s]*(\d+)|pickup[-_\s]*(\d+)').firstMatch(lower);
+    if (pickup != null) return 'PU-${pickup.group(1) ?? pickup.group(2) ?? ''}'.trim();
+    final slack = RegExp(r'slack[-_\s]*off[-_\s]*ff?[-_\s]*(\d+)|slackoff[-_\s]*(\d+)').firstMatch(lower);
+    if (slack != null) return 'SO-${slack.group(1) ?? slack.group(2) ?? ''}'.trim();
+    return text
+        .replaceAll('Pickup-', 'PU-')
+        .replaceAll('Pickup ', 'PU-')
+        .replaceAll('Slackoff-', 'SO-')
+        .replaceAll('Slack-off-', 'SO-')
+        .replaceAll('(1000 Kgf)', '')
+        .replaceAll('(1000 kgf)', '')
+        .trim();
   }
 
   List<FlSpot> _parsePoints(dynamic raw) {
@@ -370,64 +411,12 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
   }
 
   _SpecialPredictorChartData _buildFallbackChartData(PredictorChartType type, {String? note}) {
-    final seed = switch (type) {
-      PredictorChartType.hookLoad => 1.0,
-      PredictorChartType.surfaceTorque => 1.45,
-      PredictorChartType.pumpPressure => 1.9,
-    };
-
-    final minX = switch (type) {
-      PredictorChartType.hookLoad => 30.0,
-      PredictorChartType.surfaceTorque => 50.0,
-      PredictorChartType.pumpPressure => 900.0,
-    };
-
-    final maxX = switch (type) {
-      PredictorChartType.hookLoad => 260.0,
-      PredictorChartType.surfaceTorque => 350.0,
-      PredictorChartType.pumpPressure => 3900.0,
-    };
-
-    const depths = <double>[0, 800, 1600, 2400, 3200, 4200, 5200, 6200, 7200, 8000];
-
-    List<FlSpot> envelope(double offset) {
-      return List<FlSpot>.generate(depths.length, (int index) {
-        final depth = depths[index];
-        final normalized = depth / 8200.0;
-        final x = minX +
-            (maxX - minX) * (0.05 + normalized * (0.86 + offset * 0.01)) +
-            math.sin((index + seed) * 0.6 + offset) * (maxX - minX) * 0.014;
-        return FlSpot(x.clamp(minX, maxX).toDouble(), -depth);
-      });
-    }
-
-    final series = <_SpecialPredictorSeries>[
-      _SpecialPredictorSeries(name: 'Pickup-1', points: envelope(0), color: _seriesPalette[0]),
-      _SpecialPredictorSeries(name: 'Pickup-2', points: envelope(2), color: _seriesPalette[1]),
-      _SpecialPredictorSeries(name: 'Pickup-3', points: envelope(4), color: _seriesPalette[2]),
-      _SpecialPredictorSeries(name: 'Slackoff-1', points: envelope(6), color: _seriesPalette[3]),
-      _SpecialPredictorSeries(name: 'Slackoff-2', points: envelope(8), color: _seriesPalette[4]),
-      _SpecialPredictorSeries(
-        name: 'Crit',
-        points: envelope(11),
-        color: LayoutTokens.accentRed,
-        dashed: true,
-        width: 1.4,
-      ),
-    ];
-
-    final fieldPoints = List<FlSpot>.generate(12, (index) {
-      final depth = 3900 + index * 250.0 + math.sin(index + seed) * 190.0;
-      final x = minX + (maxX - minX) * (0.54 + math.sin(index * 0.7 + seed) * 0.12);
-      return FlSpot(x, -depth.clamp(0, 8200).toDouble());
-    });
-
     return _SpecialPredictorChartData.fromSeries(
       type: type,
-      source: 'Fallback local',
-      note: note,
-      series: series,
-      fieldPoints: fieldPoints,
+      source: 'Sin datos oficiales de Atalaya-Predictor',
+      note: note ?? 'No se dibujan curvas sintéticas en Special Predictor Screen.',
+      series: const <_SpecialPredictorSeries>[],
+      fieldPoints: const <FlSpot>[],
     );
   }
 }
@@ -660,6 +649,19 @@ class _CompactLegend extends StatelessWidget {
     final visible = series.take(6).toList(growable: false);
     final hiddenCount = series.length - visible.length;
 
+    if (visible.isEmpty && !hasFieldPoints) {
+      return const SizedBox(
+        height: 30,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Sin datos oficiales para graficar',
+            style: TextStyle(color: LayoutTokens.textMuted, fontSize: 11),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 30,
       child: ListView(
@@ -700,8 +702,8 @@ class _CompactLegend extends StatelessWidget {
                 style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 11),
               ),
             ),
-          if (hasFieldPoints)
-            const Row(
+          if (hasFieldPoints) ...const <Widget>[
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Icon(Icons.scatter_plot_rounded, size: 12, color: LayoutTokens.accentRed),
@@ -709,6 +711,12 @@ class _CompactLegend extends StatelessWidget {
                 Text('Datos reales', style: TextStyle(color: LayoutTokens.textMuted, fontSize: 11)),
               ],
             ),
+            SizedBox(width: 12),
+            Text(
+              'Curvas oficiales pendientes',
+              style: TextStyle(color: LayoutTokens.textMuted, fontSize: 11),
+            ),
+          ],
         ],
       ),
     );
