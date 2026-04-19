@@ -226,25 +226,25 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                       minY: chartData.minY,
                       maxY: chartData.maxY,
                       borderData: FlBorderData(show: false),
-                      lineTouchData: const LineTouchData(enabled: false),
+                      lineTouchData: LineTouchData(enabled: false),
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: true,
                         horizontalInterval: (chartData.maxY - chartData.minY) / 6,
-                        getDrawingHorizontalLine: (_) => const FlLine(
-                          color: Color(0x334A6D96),
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: const Color(0x334A6D96),
                           strokeWidth: 1,
                         ),
-                        getDrawingVerticalLine: (_) => const FlLine(
-                          color: Color(0x1F4A6D96),
+                        getDrawingVerticalLine: (_) => FlLine(
+                          color: const Color(0x1F4A6D96),
                           strokeWidth: 1,
                         ),
                       ),
                       titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
+                        topTitles: AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
                         ),
-                        rightTitles: const AxisTitles(
+                        rightTitles: AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
                         ),
                         leftTitles: AxisTitles(
@@ -303,7 +303,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                             isCurved: true,
                             color: const Color(0xFF2F73FF),
                             barWidth: 1.8,
-                            dotData: const FlDotData(show: false),
+                            dotData: FlDotData(show: false),
                           ),
                         ),
                         LineChartBarData(
@@ -312,7 +312,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                           color: LayoutTokens.accentOrange,
                           barWidth: 1.2,
                           dashArray: const <int>[4, 3],
-                          dotData: const FlDotData(show: false),
+                          dotData: FlDotData(show: false),
                         ),
                         LineChartBarData(
                           spots: chartData.criticalLine,
@@ -320,7 +320,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
                           color: LayoutTokens.accentRed,
                           barWidth: 1.2,
                           dashArray: const <int>[6, 4],
-                          dotData: const FlDotData(show: false),
+                          dotData: FlDotData(show: false),
                         ),
                       ],
                       extraLinesData: ExtraLinesData(
@@ -423,7 +423,7 @@ class _PredictorChartsPanelState extends State<PredictorChartsPanel> {
 
     final fieldDepths = List<double>.generate(14, (int index) {
       final depth = 400 + index * 420.0 + math.sin(index * 0.9 + seed) * 170;
-      return depth.clamp(0, maxY).toDouble();
+      return depth.clamp(minY, maxY).toDouble();
     });
 
     return _PredictorChartMockData(
