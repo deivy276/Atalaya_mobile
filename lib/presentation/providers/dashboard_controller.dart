@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/alert.dart';
 import '../../data/models/dashboard_payload.dart';
+import '../../data/models/app_settings.dart';
 import 'alert_settings_controller.dart';
+import 'app_settings_controller.dart';
 import 'api_client_provider.dart';
 
 enum ConnectionStatus {
@@ -119,6 +121,12 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
 
   @override
   Future<DashboardViewState> build() async {
+    ref.listen<AppSettings>(appSettingsControllerProvider, (previous, next) {
+      if (previous?.pollingIntervalSeconds != next.pollingIntervalSeconds) {
+        _scheduleNextPoll(immediate: true);
+      }
+    });
+
     final initial = await _fetch(initialLoad: true, silent: true);
     _scheduleNextPoll();
     ref.onDispose(() => _pollTimer?.cancel());
@@ -136,11 +144,13 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
 
   void _scheduleNextPoll({bool immediate = false}) {
     _pollTimer?.cancel();
+    final configuredInterval = ref.read(appSettingsControllerProvider).pollingIntervalSeconds;
+    final baseInterval = Duration(seconds: configuredInterval <= 0 ? _basePollInterval.inSeconds : configuredInterval);
     final delay = immediate
         ? Duration.zero
         : Duration(
-            seconds: (_basePollInterval.inSeconds + (_consecutiveFailures * 2)).clamp(
-              _basePollInterval.inSeconds,
+            seconds: (baseInterval.inSeconds + (_consecutiveFailures * 2)).clamp(
+              baseInterval.inSeconds,
               _maxPollInterval.inSeconds,
             ),
           );
@@ -175,7 +185,8 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
 
     try {
       final repository = ref.read(atalayaRepositoryProvider);
-      final payload = await repository.getDashboard();
+      final rawPayload = await repository.getDashboard();
+      final payload = _applyOperationalAlarms(rawPayload);
       _retryCount = 0;
       _consecutiveFailures = 0;
       final newAlertIds = _collectNewAlertIds(payload.alerts);
@@ -213,6 +224,58 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     }
   }
 
+  DashboardPayload _applyOperationalAlarms(DashboardPayload payload) {
+    final settings = ref.read(appSettingsControllerProvider);
+    if (settings.operationalAlarms.isEmpty || payload.variables.isEmpty) {
+      return payload;
+    }
+
+    final generated = <AtalayaAlert>[];
+    final now = DateTime.now().toUtc();
+
+    for (final alarm in settings.operationalAlarms) {
+      if (!alarm.enabled || !alarm.visual) {
+        continue;
+      }
+
+      for (final variable in payload.variables) {
+        final sameTag = variable.tag.trim().toUpperCase() == alarm.variableTag.trim().toUpperCase();
+        if (!sameTag || variable.value == null) {
+          continue;
+        }
+
+        if (!alarm.operator.evaluate(variable.value!, alarm.threshold)) {
+          continue;
+        }
+
+        generated.add(
+          AtalayaAlert(
+            id: 'local-alarm-${alarm.id}-${variable.sampleAt?.millisecondsSinceEpoch ?? now.millisecondsSinceEpoch}',
+            description:
+                'Alarma local: ${alarm.variableLabel} ${alarm.operator.symbol} ${alarm.threshold.toStringAsFixed(alarm.threshold.truncateToDouble() == alarm.threshold ? 0 : 2)}. Valor actual: ${variable.value!.toStringAsFixed(2)} ${variable.rawUnit}',
+            severity: AlertSeverity.critical,
+            createdAt: now,
+            attachmentsCount: 0,
+            attachments: const [],
+          ),
+        );
+        break;
+      }
+    }
+
+    if (generated.isEmpty) {
+      return payload;
+    }
+
+    return DashboardPayload(
+      well: payload.well,
+      job: payload.job,
+      latestSampleAt: payload.latestSampleAt,
+      staleThresholdSeconds: payload.staleThresholdSeconds,
+      variables: payload.variables,
+      alerts: <AtalayaAlert>[...generated, ...payload.alerts],
+    );
+  }
   String _toFriendlyErrorMessage(Object error) {
     final raw = error.toString();
     if (raw.contains('503')) {
@@ -336,3 +399,4 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     return currentId.compareTo(previousId);
   }
 }
+

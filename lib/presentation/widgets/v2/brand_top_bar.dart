@@ -3,10 +3,22 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/layout_tokens.dart';
 
 class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const BrandTopBar({super.key, this.onRefresh, this.onOpenMenu, this.onLogout});
+  const BrandTopBar({
+    super.key,
+    this.onRefresh,
+    this.onOpenSettings,
+    this.onOpenMenu,
+    this.onLogout,
+  });
 
   final VoidCallback? onRefresh;
+  final VoidCallback? onOpenSettings;
+
+  // Kept for backward compatibility with older DashboardV2Screen revisions.
   final VoidCallback? onOpenMenu;
+
+  // Logout is intentionally not rendered in the AppBar anymore.
+  // It is exposed from the Settings panel to avoid accidental taps in field operation.
   final VoidCallback? onLogout;
 
   @override
@@ -14,6 +26,8 @@ class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settingsCallback = onOpenSettings ?? onOpenMenu;
+
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -38,11 +52,17 @@ class BrandTopBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: <Widget>[
         if (onRefresh != null)
-          IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded, color: LayoutTokens.textPrimary)),
-        if (onOpenMenu != null)
-          IconButton(onPressed: onOpenMenu, icon: const Icon(Icons.tune_rounded, color: LayoutTokens.textPrimary)),
-        if (onLogout != null)
-          IconButton(onPressed: onLogout, icon: const Icon(Icons.logout_rounded, color: LayoutTokens.textPrimary)),
+          IconButton(
+            tooltip: 'Actualizar',
+            onPressed: onRefresh,
+            icon: const Icon(Icons.refresh_rounded, color: LayoutTokens.textPrimary),
+          ),
+        if (settingsCallback != null)
+          IconButton(
+            tooltip: 'Configuración',
+            onPressed: settingsCallback,
+            icon: const Icon(Icons.settings_rounded, color: LayoutTokens.textPrimary),
+          ),
       ],
     );
   }

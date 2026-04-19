@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -17,10 +17,12 @@ import '../models/dashboard_ui_model.dart';
 import '../providers/dashboard_controller.dart';
 import '../providers/trend_controller.dart';
 import '../providers/unit_preferences_controller.dart';
+import '../providers/app_settings_controller.dart';
 import 'predictor_charts_screen.dart';
 import '../widgets/v2/brand_top_bar.dart';
 import '../widgets/v2/kpi_tile_v2.dart';
 import '../widgets/v2/predictor_alerts_dock.dart';
+import '../widgets/v2/settings_panel.dart';
 import '../widgets/v2/well_overview_card.dart';
 
 class DashboardV2Screen extends ConsumerStatefulWidget {
@@ -53,13 +55,13 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(dashboardControllerProvider);
     final unitPrefs = ref.watch(unitPreferencesControllerProvider);
+    final appSettings = ref.watch(appSettingsControllerProvider);
 
     return Scaffold(
       extendBody: true,
       appBar: BrandTopBar(
         onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
-        onOpenMenu: _openLayoutControls,
-        onLogout: widget.onLogout,
+        onOpenSettings: _openSettingsPanel,
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -80,7 +82,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             ),
             data: (viewState) {
               final payload = viewState.payload;
-              final uiModel = _buildUiModel(viewState, unitPrefs);
+              final uiModel = _buildUiModel(viewState, _effectiveUnitPreferences(viewState, unitPrefs, appSettings.unitSystem));
               final width = MediaQuery.of(context).size.width;
               final isWideLayout = width >= 1100;
 
@@ -349,7 +351,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Restablecer layout'),
-          content: const Text('¿Quieres volver a la configuración visual predeterminada?'),
+          content: const Text('Â¿Quieres volver a la configuraciÃ³n visual predeterminada?'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -387,6 +389,70 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     }
   }
 
+  Map<String, String> _effectiveUnitPreferences(
+    DashboardViewState state,
+    Map<String, String> currentPreferences,
+    AtalayaUnitSystem unitSystem,
+  ) {
+    if (unitSystem == AtalayaUnitSystem.field) {
+      return currentPreferences;
+    }
+
+    final payload = state.payload;
+    final next = Map<String, String>.from(currentPreferences);
+
+    for (final variable in payload.variables) {
+      final targetUnit = _targetUnitForSystem(unitSystem, variable.rawUnit);
+      if (targetUnit == null || targetUnit.trim().isEmpty) {
+        continue;
+      }
+
+      final key = UnitConverter.makePrefKey(
+        slotIndex: variable.slot - 1,
+        tag: variable.tag,
+        rawUnit: variable.rawUnit,
+        well: payload.well,
+        job: payload.job,
+      );
+      next[key] = targetUnit;
+    }
+
+    return next;
+  }
+
+  String? _targetUnitForSystem(AtalayaUnitSystem unitSystem, String rawUnit) {
+    final dimension = UnitConverter.unitDimension(rawUnit);
+    if (dimension.isEmpty) {
+      return null;
+    }
+
+    switch (unitSystem) {
+      case AtalayaUnitSystem.field:
+        return null;
+      case AtalayaUnitSystem.english:
+        return switch (dimension) {
+          'pressure' => 'psi',
+          'length' => 'ft',
+          'velocity' => 'ft/min',
+          'flow' => 'gpm',
+          'force' => 'lbs',
+          'torque' => 'ft-lbf',
+          'temperature' => 'Â°F',
+          _ => null,
+        };
+      case AtalayaUnitSystem.metric:
+        return switch (dimension) {
+          'pressure' => 'bar',
+          'length' => 'm',
+          'velocity' => 'm/min',
+          'flow' => 'lpm',
+          'force' => 'kgf',
+          'torque' => 'NÂ·m',
+          'temperature' => 'Â°C',
+          _ => null,
+        };
+    }
+  }
   DashboardUiModel _buildUiModel(
     DashboardViewState state,
     Map<String, String> unitPreferences,
@@ -413,7 +479,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       final delta = sparkline.length >= 2
           ? ((sparkline.last - sparkline.first) / (sparkline.first == 0 ? 1 : sparkline.first)) * 100
           : 0.0;
-      final deltaPrefix = delta >= 0 ? '↗' : '↘';
+      final deltaPrefix = delta >= 0 ? 'â†—' : 'â†˜';
       final status = _resolveTileStatus(state.connectionStatus, sparkline);
 
       return VariableTileUiModel(
@@ -434,9 +500,9 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     final alerts = payload.alerts.map(_mapAlert).toList(growable: false);
 
     return DashboardUiModel(
-      appTitle: 'Operación en tiempo real',
+      appTitle: 'OperaciÃ³n en tiempo real',
       activeWell: payload.well,
-      wellStatus: state.connectionStatus == ConnectionStatus.connected ? 'En línea' : 'Datos desactualizados',
+      wellStatus: state.connectionStatus == ConnectionStatus.connected ? 'En lÃ­nea' : 'Datos desactualizados',
       tiles: tiles,
       predictorAlerts: alerts,
       selectedVariableId: _selectedVariableTag,
@@ -550,12 +616,26 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     );
   }
 
+  Future<void> _openSettingsPanel() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return AtalayaSettingsPanel(
+          onLogout: widget.onLogout,
+          onOpenLayoutControls: _openLayoutControls,
+        );
+      },
+    );
+  }
   Future<void> _openLayoutControls() async {
     final dashboardState = ref.read(dashboardControllerProvider).asData?.value;
     final currentTileCount = (dashboardState?.payload.variables.take(6).length ?? 0) + 1;
     final currentStatus = dashboardState == null
         ? 'Sin datos'
-        : (dashboardState.connectionStatus == ConnectionStatus.connected ? 'En línea' : 'Desactualizado');
+        : (dashboardState.connectionStatus == ConnectionStatus.connected ? 'En lÃ­nea' : 'Desactualizado');
     final currentStatusColor = dashboardState == null
         ? LayoutTokens.textMuted
         : (dashboardState.connectionStatus == ConnectionStatus.connected
@@ -588,7 +668,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Actual: ${_densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo'} · '
+                      'Actual: ${_densityMode == _DensityMode.compact ? 'Compacto' : 'CÃ³modo'} Â· '
                       '${_tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista'}',
                       style: const TextStyle(color: LayoutTokens.textMuted),
                     ),
@@ -617,7 +697,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                         ),
                         ButtonSegment<_DensityMode>(
                           value: _DensityMode.comfortable,
-                          label: Text('Cómodo'),
+                          label: Text('CÃ³modo'),
                         ),
                       ],
                       selected: <_DensityMode>{_densityMode},
@@ -671,7 +751,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       child: Tooltip(
                         message: _isDefaultLayoutConfig
                             ? 'No hay cambios para restablecer'
-                            : 'Restablecer a configuración predeterminada',
+                            : 'Restablecer a configuraciÃ³n predeterminada',
                         child: TextButton.icon(
                           onPressed: _isDefaultLayoutConfig
                               ? null
@@ -687,7 +767,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       const Padding(
                         padding: EdgeInsets.only(top: 6),
                         child: Text(
-                          'Ya estás usando la configuración por defecto.',
+                          'Ya estÃ¡s usando la configuraciÃ³n por defecto.',
                           style: TextStyle(
                             color: LayoutTokens.textMuted,
                             fontSize: 12,
@@ -883,7 +963,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                 children: <Widget>[
                   const Expanded(
                     child: Text(
-                      'Gráfica de variable',
+                      'GrÃ¡fica de variable',
                       style: TextStyle(
                         color: LayoutTokens.textSecondary,
                         fontWeight: FontWeight.w700,
@@ -935,7 +1015,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
               const SizedBox(height: 10),
               trendAsync.when(
                 loading: () => Text(
-                  'Cargando ${_selectedRange.displayLabel} · solo lectura',
+                  'Cargando ${_selectedRange.displayLabel} Â· solo lectura',
                   style: const TextStyle(
                     color: LayoutTokens.textMuted,
                     fontSize: 12,
@@ -950,8 +1030,8 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                 ),
                 data: (trend) => Text(
                   trend.points.length >= 2
-                      ? '${trend.points.length} muestras · ${_selectedRange.displayLabel} · eje X en tiempo · solo lectura'
-                      : 'Aún no hay suficientes muestras para ${_selectedRange.displayLabel}.',
+                      ? '${trend.points.length} muestras Â· ${_selectedRange.displayLabel} Â· eje X en tiempo Â· solo lectura'
+                      : 'AÃºn no hay suficientes muestras para ${_selectedRange.displayLabel}.',
                   style: const TextStyle(
                     color: LayoutTokens.textMuted,
                     fontSize: 12,
@@ -979,7 +1059,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
 
   String _deltaTextForPoints(List<TrendPoint> points) {
     final delta = _deltaForPoints(points);
-    final arrow = delta >= 0 ? '↗' : '↘';
+    final arrow = delta >= 0 ? 'â†—' : 'â†˜';
     final sign = delta >= 0 ? '+' : '';
     return '$arrow $sign${delta.toStringAsFixed(1)}%';
   }
@@ -1329,7 +1409,7 @@ class _VariableChartError extends StatelessWidget {
             const Icon(Icons.cloud_off_rounded, color: LayoutTokens.textMuted, size: 34),
             const SizedBox(height: 10),
             const Text(
-              'No se pudo cargar el histórico.',
+              'No se pudo cargar el histÃ³rico.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: LayoutTokens.textSecondary,
@@ -1439,7 +1519,7 @@ class _SpecialPredictorTile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Hook Load · Torque · Pressure',
+              'Hook Load Â· Torque Â· Pressure',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -1519,7 +1599,7 @@ class _ControlsStatusSummary extends StatelessWidget {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                'Estado: $currentStatus · Tiles: $currentTileCount',
+                'Estado: $currentStatus Â· Tiles: $currentTileCount',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: LayoutTokens.textMuted),
@@ -1574,3 +1654,4 @@ class _SelectedVariableBanner extends StatelessWidget {
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }
+

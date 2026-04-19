@@ -78,4 +78,48 @@ class ProPalette {
       ),
     );
   }
+
+  static ThemeData lightThemeData() {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: accent,
+      brightness: Brightness.light,
+      surface: Colors.white,
+      primary: const Color(0xFF0F766E),
+      secondary: warn,
+      error: danger,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: const Color(0xFFF4F7FB),
+      canvasColor: const Color(0xFFF4F7FB),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFFF4F7FB),
+        foregroundColor: Color(0xFF0B1220),
+        elevation: 0,
+        centerTitle: false,
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: Color(0xFF0F172A),
+        contentTextStyle: TextStyle(color: Colors.white),
+        behavior: SnackBarBehavior.floating,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: Colors.black,
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+  }
 }
