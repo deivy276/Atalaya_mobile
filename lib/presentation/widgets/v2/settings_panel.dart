@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/localization/atalaya_localizations.dart';
 import '../../../core/security/session_secure_storage.dart';
-import '../../../core/theme/layout_tokens.dart';
 import '../../../core/theme/pro_palette.dart';
 import '../../../data/models/app_settings.dart';
 import '../../../data/models/well_variable.dart';
@@ -14,11 +14,7 @@ import '../../providers/app_settings_controller.dart';
 import '../../providers/dashboard_controller.dart';
 
 class AtalayaSettingsPanel extends ConsumerStatefulWidget {
-  const AtalayaSettingsPanel({
-    super.key,
-    this.onLogout,
-    this.onOpenLayoutControls,
-  });
+  const AtalayaSettingsPanel({super.key, this.onLogout, this.onOpenLayoutControls});
 
   final VoidCallback? onLogout;
   final VoidCallback? onOpenLayoutControls;
@@ -42,19 +38,19 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final appSettings = ref.watch(appSettingsControllerProvider);
+    final colors = context.atalayaColors;
+    final settings = ref.watch(appSettingsControllerProvider);
+    final text = AtalayaTexts.of(settings.language);
     final alertSettings = ref.watch(alertSettingsControllerProvider);
     final dashboard = ref.watch(dashboardControllerProvider).value;
-    final variables = dashboard?.payload.variables.where((item) => item.configured).toList(growable: false) ??
-        const <WellVariable>[];
-
+    final variables = dashboard?.payload.variables.where((item) => item.configured).toList(growable: false) ?? const <WellVariable>[];
     _selectedAlarmTag ??= variables.isNotEmpty ? variables.first.tag : null;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: LayoutTokens.bgPrimary,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border(top: BorderSide(color: LayoutTokens.dividerSubtle)),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border(top: BorderSide(color: colors.grid)),
       ),
       child: SafeArea(
         top: false,
@@ -73,7 +69,7 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
                     width: 48,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: LayoutTokens.textMuted,
+                      color: colors.textSecondary.withValues(alpha: 0.42),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -81,50 +77,34 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
                 const SizedBox(height: 16),
                 Row(
                   children: <Widget>[
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Configuración',
-                        style: TextStyle(
-                          color: LayoutTokens.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        text.settingsTitle,
+                        style: TextStyle(color: colors.textPrimary, fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).maybePop(),
-                      tooltip: 'Cerrar',
-                      icon: const Icon(Icons.close_rounded, color: LayoutTokens.textSecondary),
+                      tooltip: text.close,
+                      icon: Icon(Icons.close_rounded, color: colors.textSecondary),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Preferencias locales para operación en campo.',
-                  style: TextStyle(color: LayoutTokens.textMuted),
-                ),
+                Text(text.settingsSubtitle, style: TextStyle(color: colors.textSecondary)),
                 const SizedBox(height: 18),
                 _SettingsSection(
-                  title: 'Preferencias de interfaz',
+                  title: text.interfacePreferences,
                   icon: Icons.palette_outlined,
                   children: <Widget>[
-                    _ThemePreferenceSelector(
-                      selected: appSettings.themePreference,
-                      onChanged: ref.read(appSettingsControllerProvider.notifier).setThemePreference,
-                    ),
-                    _SettingsSegmentedRow<AtalayaLanguage>(
-                      label: 'Idioma de la app',
-                      selected: appSettings.language,
-                      values: AtalayaLanguage.values,
-                      labelBuilder: (value) => value.label,
-                      onChanged: ref.read(appSettingsControllerProvider.notifier).setLanguage,
-                    ),
+                    _ThemeSelector(selected: settings.themePreference, text: text),
+                    _LanguageSelector(selected: settings.language, text: text),
                     if (widget.onOpenLayoutControls != null)
-                      _SettingsActionTile(
+                      _ActionTile(
                         icon: Icons.dashboard_customize_outlined,
-                        title: 'Layout del dashboard',
-                        subtitle: 'Densidad y vista de tarjetas.',
-                        actionLabel: 'Abrir',
+                        title: text.dashboardLayout,
+                        subtitle: text.dashboardLayoutSubtitle,
+                        actionLabel: text.open,
                         onTap: () async {
                           Navigator.of(context).pop();
                           await Future<void>.delayed(const Duration(milliseconds: 160));
@@ -134,39 +114,30 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
                   ],
                 ),
                 _SettingsSection(
-                  title: 'Parámetros operativos',
+                  title: text.operationalParameters,
                   icon: Icons.tune_rounded,
                   children: <Widget>[
-                    _SettingsSegmentedRow<AtalayaUnitSystem>(
-                      label: 'Sistema de unidades',
-                      selected: appSettings.unitSystem,
+                    _ChoiceRow<AtalayaUnitSystem>(
+                      label: text.unitSystem,
+                      selected: settings.unitSystem,
                       values: AtalayaUnitSystem.values,
-                      labelBuilder: (value) => value.label,
-                      subtitleBuilder: (value) => value.description,
+                      labelBuilder: text.unitLabel,
+                      subtitle: text.unitDescription(settings.unitSystem),
                       onChanged: ref.read(appSettingsControllerProvider.notifier).setUnitSystem,
                     ),
-                    _PollingSelector(
-                      selectedSeconds: appSettings.pollingIntervalSeconds,
-                      onChanged: (seconds) async {
-                        await ref.read(appSettingsControllerProvider.notifier).setPollingIntervalSeconds(seconds);
-                        ref.invalidate(dashboardControllerProvider);
-                      },
-                    ),
+                    _PollingSelector(selectedSeconds: settings.pollingIntervalSeconds, text: text),
                   ],
                 ),
                 _SettingsSection(
-                  title: 'Alarmas y notificaciones',
+                  title: text.alarmsAndNotifications,
                   icon: Icons.notifications_active_outlined,
                   children: <Widget>[
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
-                      value: appSettings.pushAlertsEnabled && alertSettings.enabled,
-                      activeColor: LayoutTokens.accentGreen,
-                      title: const Text('Alertas push', style: TextStyle(color: LayoutTokens.textPrimary)),
-                      subtitle: const Text(
-                        'Activa eventos críticos del pozo en el teléfono.',
-                        style: TextStyle(color: LayoutTokens.textMuted),
-                      ),
+                      value: settings.pushAlertsEnabled && alertSettings.enabled,
+                      activeColor: colors.safe,
+                      title: Text(text.pushAlerts, style: TextStyle(color: colors.textPrimary)),
+                      subtitle: Text(text.pushAlertsSubtitle, style: TextStyle(color: colors.textSecondary)),
                       onChanged: (value) async {
                         await ref.read(appSettingsControllerProvider.notifier).setPushAlertsEnabled(value);
                         await ref.read(alertSettingsControllerProvider.notifier).setEnabled(value);
@@ -175,21 +146,22 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       value: alertSettings.visual,
-                      activeColor: LayoutTokens.accentGreen,
-                      title: const Text('Alerta visual', style: TextStyle(color: LayoutTokens.textPrimary)),
-                      subtitle: const Text('Banner/modal cuando llegue un evento notificado.', style: TextStyle(color: LayoutTokens.textMuted)),
+                      activeColor: colors.safe,
+                      title: Text(text.visualAlert, style: TextStyle(color: colors.textPrimary)),
+                      subtitle: Text(text.visualAlertSubtitle, style: TextStyle(color: colors.textSecondary)),
                       onChanged: ref.read(alertSettingsControllerProvider.notifier).setVisual,
                     ),
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       value: alertSettings.sound,
-                      activeColor: LayoutTokens.accentGreen,
-                      title: const Text('Alerta sonora', style: TextStyle(color: LayoutTokens.textPrimary)),
-                      subtitle: const Text('Preparado para integración con notificaciones nativas.', style: TextStyle(color: LayoutTokens.textMuted)),
+                      activeColor: colors.safe,
+                      title: Text(text.soundAlert, style: TextStyle(color: colors.textPrimary)),
+                      subtitle: Text(text.soundAlertSubtitle, style: TextStyle(color: colors.textSecondary)),
                       onChanged: ref.read(alertSettingsControllerProvider.notifier).setSound,
                     ),
                     const SizedBox(height: 12),
                     _AlarmEditor(
+                      text: text,
                       variables: variables,
                       selectedTag: _selectedAlarmTag,
                       operator: _alarmOperator,
@@ -200,39 +172,31 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
                       onOperatorChanged: (value) => setState(() => _alarmOperator = value),
                       onVisualChanged: (value) => setState(() => _alarmVisual = value),
                       onSoundChanged: (value) => setState(() => _alarmSound = value),
-                      onAdd: () => _addOperationalAlarm(variables),
+                      onAdd: () => _addOperationalAlarm(variables, text),
                     ),
                     const SizedBox(height: 10),
-                    _AlarmList(alarms: appSettings.operationalAlarms),
+                    _AlarmList(alarms: settings.operationalAlarms, text: text),
                   ],
                 ),
                 _SettingsSection(
-                  title: 'Integración del ecosistema Atalaya',
+                  title: text.integration,
                   icon: Icons.hub_outlined,
-                  children: <Widget>[
-                    _SyncStatusCard(dashboard: dashboard),
-                  ],
+                  children: <Widget>[_SyncStatusCard(dashboard: dashboard, text: text)],
                 ),
                 _SettingsSection(
-                  title: 'Cuenta y sesión',
+                  title: text.accountAndSession,
                   icon: Icons.account_circle_outlined,
                   children: <Widget>[
-                    const _UserProfileCard(),
-                    const SizedBox(height: 12),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: LayoutTokens.accentRed,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      onPressed: widget.onLogout == null
-                          ? null
-                          : () {
-                              Navigator.of(context).pop();
-                              widget.onLogout?.call();
-                            },
-                      icon: const Icon(Icons.logout_rounded),
-                      label: const Text('Cerrar sesión'),
+                    _UserProfileCard(text: text),
+                    const SizedBox(height: 10),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
+                      title: Text(text.logout, style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w800)),
+                      onTap: () {
+                        Navigator.of(context).maybePop();
+                        widget.onLogout?.call();
+                      },
                     ),
                   ],
                 ),
@@ -244,13 +208,11 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
     );
   }
 
-  Future<void> _addOperationalAlarm(List<WellVariable> variables) async {
+  Future<void> _addOperationalAlarm(List<WellVariable> variables, AtalayaTexts text) async {
     final tag = _selectedAlarmTag;
     final threshold = double.tryParse(_alarmThresholdController.text.trim().replaceAll(',', '.'));
     if (tag == null || tag.trim().isEmpty || threshold == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona una variable y un umbral válido.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text.invalidAlarm)));
       return;
     }
 
@@ -274,11 +236,8 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
     );
 
     await ref.read(appSettingsControllerProvider.notifier).addOperationalAlarm(alarm);
-
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Alarma creada para ${alarm.variableLabel}.')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text.alarmCreated(alarm.variableLabel))));
   }
 }
 
@@ -291,31 +250,23 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
+        color: colors.card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
+        border: Border.all(color: colors.grid),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(icon, color: LayoutTokens.textSecondary, size: 20),
+              Icon(icon, color: colors.textSecondary, size: 20),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: LayoutTokens.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+              Expanded(child: Text(title, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800, fontSize: 16))),
             ],
           ),
           const SizedBox(height: 12),
@@ -326,41 +277,77 @@ class _SettingsSection extends StatelessWidget {
   }
 }
 
-
-class _ThemePreferenceSelector extends StatelessWidget {
-  const _ThemePreferenceSelector({
-    required this.selected,
-    required this.onChanged,
-  });
+class _ThemeSelector extends ConsumerWidget {
+  const _ThemeSelector({required this.selected, required this.text});
 
   final AtalayaThemePreference selected;
-  final ValueChanged<AtalayaThemePreference> onChanged;
+  final AtalayaTexts text;
 
   @override
-  Widget build(BuildContext context) {
-    final visual = context.atalayaColors;
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.atalayaColors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            'Tema visual',
-            style: TextStyle(color: visual.textSecondary, fontWeight: FontWeight.w800),
-          ),
+          Text(text.visualTheme, style: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          Text(
-            'Oscuro para operación continua, Claro para alta luminosidad y Sistema para seguir Android/iOS.',
-            style: TextStyle(color: visual.textSecondary, fontSize: 12),
-          ),
-          const SizedBox(height: 12),
-          ...AtalayaThemePreference.values.map(
-            (item) => _ThemePreferenceTile(
-              preference: item,
-              selected: selected == item,
-              onTap: () => onChanged(item),
-            ),
+          Text(text.visualThemeHelp, style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+          const SizedBox(height: 10),
+          ...AtalayaThemePreference.values.map((item) {
+            return _OptionTile(
+              active: selected == item,
+              icon: item.icon,
+              title: text.themeLabel(item),
+              subtitle: text.themeDescription(item),
+              onTap: () => ref.read(appSettingsControllerProvider.notifier).setThemePreference(item),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _LanguageSelector extends ConsumerWidget {
+  const _LanguageSelector({required this.selected, required this.text});
+
+  final AtalayaLanguage selected;
+  final AtalayaTexts text;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.atalayaColors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(text.appLanguage, style: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text(text.appLanguageHelp, style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+          const SizedBox(height: 10),
+          Row(
+            children: AtalayaLanguage.values.map((language) {
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: language == AtalayaLanguage.es ? 8 : 0),
+                  child: _LanguageTile(
+                    active: selected == language,
+                    label: text.languageLabel(language),
+                    subtitle: text.languageDescription(language),
+                    onTap: () async {
+                      await ref.read(appSettingsControllerProvider.notifier).setLanguage(language);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(AtalayaTexts.of(language).languageChanged(language)), duration: const Duration(milliseconds: 1200)),
+                      );
+                    },
+                  ),
+                ),
+              );
+            }).toList(growable: false),
           ),
         ],
       ),
@@ -368,84 +355,88 @@ class _ThemePreferenceSelector extends StatelessWidget {
   }
 }
 
-class _ThemePreferenceTile extends StatelessWidget {
-  const _ThemePreferenceTile({
-    required this.preference,
-    required this.selected,
-    required this.onTap,
-  });
+class _LanguageTile extends StatelessWidget {
+  const _LanguageTile({required this.active, required this.label, required this.subtitle, required this.onTap});
 
-  final AtalayaThemePreference preference;
-  final bool selected;
+  final bool active;
+  final String label;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final current = context.atalayaColors;
-    final preview = switch (preference) {
-      AtalayaThemePreference.dark => AtalayaVisualPalette.dark,
-      AtalayaThemePreference.light => AtalayaVisualPalette.light,
-      AtalayaThemePreference.system => MediaQuery.platformBrightnessOf(context) == Brightness.dark
-          ? AtalayaVisualPalette.dark
-          : AtalayaVisualPalette.light,
-    };
+    final colors = context.atalayaColors;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: active ? colors.primary.withValues(alpha: 0.14) : colors.plotArea,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: active ? colors.primary : colors.grid, width: active ? 1.4 : 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(Icons.translate_rounded, size: 18, color: active ? colors.primary : colors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(child: Text(label, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800))),
+                if (active) Icon(Icons.check_circle_rounded, color: colors.primary, size: 18),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({required this.active, required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  final bool active;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
+          duration: const Duration(milliseconds: 140),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: selected ? current.primary.withValues(alpha: 0.12) : current.plotArea,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: selected ? current.primary : current.grid,
-              width: selected ? 1.4 : 1,
-            ),
+            color: active ? colors.primary.withValues(alpha: 0.12) : colors.plotArea,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: active ? colors.primary : colors.grid, width: active ? 1.3 : 1),
           ),
           child: Row(
             children: <Widget>[
-              _ThemePreviewSwatch(palette: preview),
-              const SizedBox(width: 12),
+              Icon(icon, color: active ? colors.primary : colors.textSecondary, size: 20),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Icon(preference.icon, size: 18, color: selected ? current.primary : current.textSecondary),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            preference.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: current.textPrimary, fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      preference.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: current.textSecondary, fontSize: 12),
-                    ),
+                    Text(title, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.textSecondary, fontSize: 12)),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 140),
-                child: selected
-                    ? Icon(Icons.check_circle_rounded, key: const ValueKey('selected'), color: current.primary)
-                    : Icon(Icons.circle_outlined, key: const ValueKey('idle'), color: current.textSecondary),
-              ),
+              if (active) Icon(Icons.check_circle_rounded, color: colors.primary),
             ],
           ),
         ),
@@ -454,123 +445,40 @@ class _ThemePreferenceTile extends StatelessWidget {
   }
 }
 
-class _ThemePreviewSwatch extends StatelessWidget {
-  const _ThemePreviewSwatch({required this.palette});
-
-  final AtalayaVisualPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 74,
-      height: 52,
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: palette.background,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.grid),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: double.infinity,
-            height: 12,
-            decoration: BoxDecoration(
-              color: palette.card,
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          const Spacer(),
-          Row(
-            children: <Widget>[
-              _SwatchDot(color: palette.curvePrimary),
-              const SizedBox(width: 4),
-              _SwatchDot(color: palette.curveSecondaryA),
-              const SizedBox(width: 4),
-              _SwatchDot(color: palette.curveSecondaryB),
-              const Spacer(),
-              _SwatchDot(color: palette.scatter, size: 8),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SwatchDot extends StatelessWidget {
-  const _SwatchDot({required this.color, this.size = 7});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
-  }
-}
-
-class _SettingsSegmentedRow<T extends Object> extends StatelessWidget {
-  const _SettingsSegmentedRow({
-    required this.label,
-    required this.selected,
-    required this.values,
-    required this.labelBuilder,
-    required this.onChanged,
-    this.subtitleBuilder,
-  });
+class _ChoiceRow<T extends Object> extends StatelessWidget {
+  const _ChoiceRow({required this.label, required this.selected, required this.values, required this.labelBuilder, required this.onChanged, this.subtitle});
 
   final String label;
   final T selected;
   final List<T> values;
   final String Function(T value) labelBuilder;
-  final String Function(T value)? subtitleBuilder;
   final ValueChanged<T> onChanged;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(label, style: const TextStyle(color: LayoutTokens.textSecondary, fontWeight: FontWeight.w700)),
+          Text(label, style: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SegmentedButton<T>(
               showSelectedIcon: false,
-              style: ButtonStyle(
-                foregroundColor: WidgetStateProperty.all(LayoutTokens.textSecondary),
-                backgroundColor: WidgetStateProperty.all(LayoutTokens.bgPrimary),
-              ),
-              segments: values
-                  .map(
-                    (value) => ButtonSegment<T>(
-                      value: value,
-                      label: Text(labelBuilder(value)),
-                    ),
-                  )
-                  .toList(growable: false),
+              segments: values.map((value) => ButtonSegment<T>(value: value, label: Text(labelBuilder(value)))).toList(growable: false),
               selected: <T>{selected},
               onSelectionChanged: (selection) {
-                if (selection.isNotEmpty) {
-                  onChanged(selection.first);
-                }
+                if (selection.isNotEmpty) onChanged(selection.first);
               },
             ),
           ),
-          if (subtitleBuilder != null) ...<Widget>[
+          if (subtitle != null) ...<Widget>[
             const SizedBox(height: 6),
-            Text(
-              subtitleBuilder!(selected),
-              style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 12),
-            ),
+            Text(subtitle!, style: TextStyle(color: colors.textSecondary, fontSize: 12)),
           ],
         ],
       ),
@@ -578,14 +486,44 @@ class _SettingsSegmentedRow<T extends Object> extends StatelessWidget {
   }
 }
 
-class _SettingsActionTile extends StatelessWidget {
-  const _SettingsActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.actionLabel,
-    required this.onTap,
-  });
+class _PollingSelector extends ConsumerWidget {
+  const _PollingSelector({required this.selectedSeconds, required this.text});
+
+  final int selectedSeconds;
+  final AtalayaTexts text;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.atalayaColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(text.pollingRate, style: TextStyle(color: colors.textSecondary, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Text(text.pollingHelp, style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: AppSettings.pollingOptionsSeconds.map((seconds) {
+            return ChoiceChip(
+              label: Text('${seconds}s'),
+              selected: seconds == selectedSeconds,
+              showCheckmark: false,
+              onSelected: (_) async {
+                await ref.read(appSettingsControllerProvider.notifier).setPollingIntervalSeconds(seconds);
+                ref.invalidate(dashboardControllerProvider);
+              },
+            );
+          }).toList(growable: false),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({required this.icon, required this.title, required this.subtitle, required this.actionLabel, required this.onTap});
 
   final IconData icon;
   final String title;
@@ -595,60 +533,20 @@ class _SettingsActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: LayoutTokens.textSecondary),
-      title: Text(title, style: const TextStyle(color: LayoutTokens.textPrimary, fontWeight: FontWeight.w700)),
-      subtitle: Text(subtitle, style: const TextStyle(color: LayoutTokens.textMuted)),
+      leading: Icon(icon, color: colors.textSecondary),
+      title: Text(title, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700)),
+      subtitle: Text(subtitle, style: TextStyle(color: colors.textSecondary)),
       trailing: TextButton(onPressed: onTap, child: Text(actionLabel)),
-    );
-  }
-}
-
-class _PollingSelector extends StatelessWidget {
-  const _PollingSelector({required this.selectedSeconds, required this.onChanged});
-
-  final int selectedSeconds;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        const Text('Tasa de refresco', style: TextStyle(color: LayoutTokens.textSecondary, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: AppSettings.pollingOptionsSeconds.map((seconds) {
-            final selected = selectedSeconds == seconds;
-            return ChoiceChip(
-              label: Text('${seconds}s'),
-              selected: selected,
-              showCheckmark: false,
-              selectedColor: const Color(0x4434D399),
-              backgroundColor: LayoutTokens.bgPrimary,
-              side: BorderSide(color: selected ? LayoutTokens.accentGreen : LayoutTokens.dividerSubtle),
-              labelStyle: TextStyle(
-                color: selected ? Colors.white : LayoutTokens.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-              onSelected: (_) => onChanged(seconds),
-            );
-          }).toList(growable: false),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Intervalos rápidos consumen más batería y datos móviles.',
-          style: TextStyle(color: LayoutTokens.textMuted, fontSize: 12),
-        ),
-      ],
     );
   }
 }
 
 class _AlarmEditor extends StatelessWidget {
   const _AlarmEditor({
+    required this.text,
     required this.variables,
     required this.selectedTag,
     required this.operator,
@@ -662,6 +560,7 @@ class _AlarmEditor extends StatelessWidget {
     required this.onAdd,
   });
 
+  final AtalayaTexts text;
   final List<WellVariable> variables;
   final String? selectedTag;
   final AtalayaAlarmOperator operator;
@@ -676,28 +575,19 @@ class _AlarmEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: LayoutTokens.bgPrimary,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
-      ),
+      decoration: BoxDecoration(color: colors.plotArea, borderRadius: BorderRadius.circular(16), border: Border.all(color: colors.grid)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text('Nueva alarma operacional', style: TextStyle(color: LayoutTokens.textPrimary, fontWeight: FontWeight.w800)),
+          Text(text.newAlarm, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
             value: selectedTag,
-            dropdownColor: LayoutTokens.surfaceCard,
-            decoration: const InputDecoration(labelText: 'Variable'),
-            items: variables
-                .map((item) => DropdownMenuItem<String>(
-                      value: item.tag,
-                      child: Text('${item.label} (${item.tag})'),
-                    ))
-                .toList(growable: false),
+            decoration: InputDecoration(labelText: text.variable),
+            items: variables.map((item) => DropdownMenuItem<String>(value: item.tag, child: Text('${item.label} (${item.tag})'))).toList(growable: false),
             onChanged: onTagChanged,
           ),
           const SizedBox(height: 10),
@@ -706,14 +596,8 @@ class _AlarmEditor extends StatelessWidget {
               Expanded(
                 child: DropdownButtonFormField<AtalayaAlarmOperator>(
                   value: operator,
-                  dropdownColor: LayoutTokens.surfaceCard,
-                  decoration: const InputDecoration(labelText: 'Condición'),
-                  items: AtalayaAlarmOperator.values
-                      .map((item) => DropdownMenuItem<AtalayaAlarmOperator>(
-                            value: item,
-                            child: Text(item.symbol),
-                          ))
-                      .toList(growable: false),
+                  decoration: InputDecoration(labelText: text.condition),
+                  items: AtalayaAlarmOperator.values.map((item) => DropdownMenuItem<AtalayaAlarmOperator>(value: item, child: Text(item.symbol))).toList(growable: false),
                   onChanged: (value) {
                     if (value != null) onOperatorChanged(value);
                   },
@@ -725,35 +609,15 @@ class _AlarmEditor extends StatelessWidget {
                 child: TextField(
                   controller: thresholdController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Umbral'),
-                  style: const TextStyle(color: LayoutTokens.textPrimary),
+                  decoration: InputDecoration(labelText: text.threshold),
+                  style: TextStyle(color: colors.textPrimary),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: visual,
-            activeColor: LayoutTokens.accentGreen,
-            title: const Text('Visual', style: TextStyle(color: LayoutTokens.textSecondary)),
-            onChanged: (value) => onVisualChanged(value ?? true),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: sound,
-            activeColor: LayoutTokens.accentGreen,
-            title: const Text('Sonora', style: TextStyle(color: LayoutTokens.textSecondary)),
-            onChanged: (value) => onSoundChanged(value ?? false),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: variables.isEmpty ? null : onAdd,
-              icon: const Icon(Icons.add_alert_rounded),
-              label: const Text('Crear alarma'),
-            ),
-          ),
+          CheckboxListTile(contentPadding: EdgeInsets.zero, value: visual, activeColor: colors.safe, title: Text(text.visual, style: TextStyle(color: colors.textSecondary)), onChanged: (value) => onVisualChanged(value ?? true)),
+          CheckboxListTile(contentPadding: EdgeInsets.zero, value: sound, activeColor: colors.safe, title: Text(text.sound, style: TextStyle(color: colors.textSecondary)), onChanged: (value) => onSoundChanged(value ?? false)),
+          Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: variables.isEmpty ? null : onAdd, icon: const Icon(Icons.add_alert_rounded), label: Text(text.createAlarm))),
         ],
       ),
     );
@@ -761,57 +625,38 @@ class _AlarmEditor extends StatelessWidget {
 }
 
 class _AlarmList extends ConsumerWidget {
-  const _AlarmList({required this.alarms});
+  const _AlarmList({required this.alarms, required this.text});
 
   final List<OperationalAlarmRule> alarms;
+  final AtalayaTexts text;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (alarms.isEmpty) {
-      return const Text('No hay alarmas operacionales configuradas.', style: TextStyle(color: LayoutTokens.textMuted));
-    }
+    final colors = context.atalayaColors;
+    if (alarms.isEmpty) return Text(text.noAlarms, style: TextStyle(color: colors.textSecondary));
 
     return Column(
       children: alarms.map((alarm) {
+        final threshold = alarm.threshold.toStringAsFixed(alarm.threshold.truncateToDouble() == alarm.threshold ? 0 : 2);
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: LayoutTokens.bgPrimary,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: LayoutTokens.dividerSubtle),
-          ),
+          decoration: BoxDecoration(color: colors.plotArea, borderRadius: BorderRadius.circular(14), border: Border.all(color: colors.grid)),
           child: Row(
             children: <Widget>[
-              Icon(
-                alarm.enabled ? Icons.notifications_active_rounded : Icons.notifications_off_outlined,
-                color: alarm.enabled ? LayoutTokens.accentOrange : LayoutTokens.textMuted,
-              ),
+              Icon(alarm.enabled ? Icons.notifications_active_rounded : Icons.notifications_off_outlined, color: alarm.enabled ? const Color(0xFFF59E0B) : colors.textSecondary),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      alarm.variableLabel,
-                      style: const TextStyle(color: LayoutTokens.textPrimary, fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      '${alarm.operator.symbol} ${alarm.threshold.toStringAsFixed(alarm.threshold.truncateToDouble() == alarm.threshold ? 0 : 2)} · ${alarm.sound ? 'sonora' : 'sin sonido'}',
-                      style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 12),
-                    ),
+                    Text(alarm.variableLabel, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700)),
+                    Text('${alarm.operator.symbol} $threshold · ${text.soundLabel(alarm.sound)}', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
                   ],
                 ),
               ),
-              Switch.adaptive(
-                value: alarm.enabled,
-                activeColor: LayoutTokens.accentGreen,
-                onChanged: (value) => ref.read(appSettingsControllerProvider.notifier).toggleOperationalAlarm(alarm.id, value),
-              ),
-              IconButton(
-                onPressed: () => ref.read(appSettingsControllerProvider.notifier).removeOperationalAlarm(alarm.id),
-                icon: const Icon(Icons.delete_outline_rounded, color: LayoutTokens.textMuted),
-              ),
+              Switch.adaptive(value: alarm.enabled, activeColor: colors.safe, onChanged: (value) => ref.read(appSettingsControllerProvider.notifier).toggleOperationalAlarm(alarm.id, value)),
+              IconButton(onPressed: () => ref.read(appSettingsControllerProvider.notifier).removeOperationalAlarm(alarm.id), icon: Icon(Icons.delete_outline_rounded, color: colors.textSecondary)),
             ],
           ),
         );
@@ -821,52 +666,25 @@ class _AlarmList extends ConsumerWidget {
 }
 
 class _SyncStatusCard extends StatelessWidget {
-  const _SyncStatusCard({required this.dashboard});
+  const _SyncStatusCard({required this.dashboard, required this.text});
 
   final DashboardViewState? dashboard;
+  final AtalayaTexts text;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     final latest = dashboard?.payload.latestSampleAt?.toLocal();
-    final status = dashboard?.connectionStatus;
-    final statusText = switch (status) {
-      ConnectionStatus.connected => 'Conectado',
-      ConnectionStatus.stale => 'Desactualizado',
-      ConnectionStatus.retrying => 'Reintentando',
-      ConnectionStatus.offline => 'Sin conexión',
-      ConnectionStatus.waiting || null => 'Esperando',
-    };
-    final color = switch (status) {
-      ConnectionStatus.connected => LayoutTokens.accentGreen,
-      ConnectionStatus.stale || ConnectionStatus.retrying => LayoutTokens.accentOrange,
-      ConnectionStatus.offline => LayoutTokens.accentRed,
-      ConnectionStatus.waiting || null => LayoutTokens.textMuted,
-    };
-
-    final latencyText = latest == null
-        ? 'Sin muestra reciente'
-        : 'Última muestra ${DateFormat('dd/MM HH:mm:ss').format(latest)} · latencia ${DateTime.now().difference(latest).inSeconds}s';
-
+    final statusText = text.connectionStatusLabel(dashboard?.connectionStatus);
+    final latencyText = latest == null ? text.noRecentSample : text.latestSample(DateFormat('dd/MM HH:mm:ss').format(latest), DateTime.now().difference(latest).inSeconds);
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: LayoutTokens.bgPrimary,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
-      ),
+      decoration: BoxDecoration(color: colors.plotArea, borderRadius: BorderRadius.circular(16), border: Border.all(color: colors.grid)),
       child: Row(
         children: <Widget>[
-          Icon(Icons.circle, size: 12, color: color),
+          Icon(Icons.circle, size: 12, color: colors.safe),
           const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(statusText, style: TextStyle(color: color, fontWeight: FontWeight.w800)),
-                Text(latencyText, style: const TextStyle(color: LayoutTokens.textMuted, fontSize: 12)),
-              ],
-            ),
-          ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[Text(statusText, style: TextStyle(color: colors.safe, fontWeight: FontWeight.w800)), Text(latencyText, style: TextStyle(color: colors.textSecondary, fontSize: 12))])),
         ],
       ),
     );
@@ -874,34 +692,25 @@ class _SyncStatusCard extends StatelessWidget {
 }
 
 class _UserProfileCard extends StatelessWidget {
-  const _UserProfileCard();
+  const _UserProfileCard({required this.text});
+
+  final AtalayaTexts text;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return FutureBuilder<String?>(
       future: _readUserLabel(),
       builder: (context, snapshot) {
-        final user = snapshot.data ?? 'Operador conectado';
+        final user = snapshot.data ?? text.operatorConnected;
         return Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: LayoutTokens.bgPrimary,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: LayoutTokens.dividerSubtle),
-          ),
+          decoration: BoxDecoration(color: colors.plotArea, borderRadius: BorderRadius.circular(16), border: Border.all(color: colors.grid)),
           child: Row(
             children: <Widget>[
-              const Icon(Icons.verified_user_outlined, color: LayoutTokens.textSecondary),
+              Icon(Icons.verified_user_outlined, color: colors.textSecondary),
               const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(user, style: const TextStyle(color: LayoutTokens.textPrimary, fontWeight: FontWeight.w800)),
-                    const Text('Sesión protegida', style: TextStyle(color: LayoutTokens.textMuted, fontSize: 12)),
-                  ],
-                ),
-              ),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[Text(user, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800)), Text(text.protectedSession, style: TextStyle(color: colors.textSecondary, fontSize: 12))])),
             ],
           ),
         );
@@ -911,23 +720,23 @@ class _UserProfileCard extends StatelessWidget {
 
   Future<String?> _readUserLabel() async {
     final token = await SessionSecureStorage().readToken();
-    if (token == null || token.trim().isEmpty) {
-      return null;
-    }
-    return _decodeSubject(token) ?? 'Operador conectado';
+    if (token == null || token.trim().isEmpty) return null;
+    return _decodeSubject(token) ?? text.operatorConnected;
   }
 
   String? _decodeSubject(String token) {
-    try {
-      final firstSegment = token.split('.').first;
-      final normalized = base64Url.normalize(firstSegment);
-      final decoded = jsonDecode(utf8.decode(base64Url.decode(normalized)));
-      if (decoded is Map) {
-        final sub = decoded['sub'] ?? decoded['username'] ?? decoded['email'];
-        if (sub != null && sub.toString().trim().isNotEmpty) {
-          return sub.toString();
-        }
+    final parts = token.split('.');
+    if (parts.length < 2) {
+      if (token.startsWith('sid:')) {
+        final sidParts = token.split(':');
+        return sidParts.length >= 2 ? sidParts[1] : null;
       }
+      return null;
+    }
+    try {
+      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final decoded = jsonDecode(payload);
+      if (decoded is Map) return (decoded['sub'] ?? decoded['username'] ?? decoded['email'])?.toString();
     } catch (_) {
       return null;
     }

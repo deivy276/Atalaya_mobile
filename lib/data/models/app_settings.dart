@@ -1,83 +1,55 @@
 import 'package:flutter/material.dart';
 
-/// High-level UI/theme preference persisted locally on the device.
 enum AtalayaThemePreference {
-  system(
-    'Sistema',
-    'Sigue automáticamente el tema del dispositivo.',
-    Icons.phone_android_rounded,
-  ),
-  dark(
-    'Oscuro',
-    'Azules medianoche para reducir fatiga visual en campo.',
-    Icons.dark_mode_rounded,
-  ),
-  light(
-    'Claro',
-    'Grises técnicos de alto contraste para alta luminosidad.',
-    Icons.light_mode_rounded,
-  );
+  system(Icons.phone_android_rounded),
+  dark(Icons.dark_mode_rounded),
+  light(Icons.light_mode_rounded);
 
-  const AtalayaThemePreference(this.label, this.description, this.icon);
-
-  final String label;
-  final String description;
+  const AtalayaThemePreference(this.icon);
   final IconData icon;
 
-  ThemeMode get themeMode {
-    switch (this) {
-      case AtalayaThemePreference.system:
-        return ThemeMode.system;
-      case AtalayaThemePreference.dark:
-        return ThemeMode.dark;
-      case AtalayaThemePreference.light:
-        return ThemeMode.light;
-    }
-  }
+  ThemeMode get themeMode => switch (this) {
+        AtalayaThemePreference.system => ThemeMode.system,
+        AtalayaThemePreference.dark => ThemeMode.dark,
+        AtalayaThemePreference.light => ThemeMode.light,
+      };
 
   static AtalayaThemePreference fromRaw(String? raw) {
+    final normalized = (raw ?? '').trim().toLowerCase();
     for (final value in AtalayaThemePreference.values) {
-      if (value.name == raw) {
-        return value;
-      }
+      if (value.name == normalized) return value;
     }
     return AtalayaThemePreference.dark;
   }
 }
 
 enum AtalayaLanguage {
-  es('Español'),
-  en('English');
+  es('es'),
+  en('en');
 
-  const AtalayaLanguage(this.label);
-
-  final String label;
+  const AtalayaLanguage(this.code);
+  final String code;
 
   static AtalayaLanguage fromRaw(String? raw) {
+    final normalized = (raw ?? '').trim().toLowerCase();
+    if (normalized == 'en' || normalized == 'eng' || normalized == 'english' || normalized == 'ingles' || normalized == 'inglés') return AtalayaLanguage.en;
+    if (normalized == 'es' || normalized == 'esp' || normalized == 'spanish' || normalized == 'espanol' || normalized == 'español') return AtalayaLanguage.es;
     for (final value in AtalayaLanguage.values) {
-      if (value.name == raw) {
-        return value;
-      }
+      if (value.name == normalized || value.code == normalized) return value;
     }
     return AtalayaLanguage.es;
   }
 }
 
 enum AtalayaUnitSystem {
-  field('Campo', 'Unidades de origen'),
-  english('Inglés', 'psi · lbf · gpm · ft'),
-  metric('Métrico', 'bar · kgf · lpm · m');
-
-  const AtalayaUnitSystem(this.label, this.description);
-
-  final String label;
-  final String description;
+  field,
+  english,
+  metric;
 
   static AtalayaUnitSystem fromRaw(String? raw) {
+    final normalized = (raw ?? '').trim().toLowerCase();
     for (final value in AtalayaUnitSystem.values) {
-      if (value.name == raw) {
-        return value;
-      }
+      if (value.name == normalized) return value;
     }
     return AtalayaUnitSystem.field;
   }
@@ -88,23 +60,19 @@ enum AtalayaAlarmOperator {
   lessOrEqual('≤');
 
   const AtalayaAlarmOperator(this.symbol);
-
   final String symbol;
 
   bool evaluate(double current, double threshold) {
-    switch (this) {
-      case AtalayaAlarmOperator.greaterOrEqual:
-        return current >= threshold;
-      case AtalayaAlarmOperator.lessOrEqual:
-        return current <= threshold;
-    }
+    return switch (this) {
+      AtalayaAlarmOperator.greaterOrEqual => current >= threshold,
+      AtalayaAlarmOperator.lessOrEqual => current <= threshold,
+    };
   }
 
   static AtalayaAlarmOperator fromRaw(String? raw) {
+    final normalized = (raw ?? '').trim().toLowerCase();
     for (final value in AtalayaAlarmOperator.values) {
-      if (value.name == raw) {
-        return value;
-      }
+      if (value.name == normalized) return value;
     }
     return AtalayaAlarmOperator.greaterOrEqual;
   }
@@ -144,18 +112,16 @@ class OperationalAlarmRule {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'id': id,
-      'variableTag': variableTag,
-      'variableLabel': variableLabel,
-      'operator': operator.name,
-      'threshold': threshold,
-      'enabled': enabled,
-      'visual': visual,
-      'sound': sound,
-    };
-  }
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'variableTag': variableTag,
+        'variableLabel': variableLabel,
+        'operator': operator.name,
+        'threshold': threshold,
+        'enabled': enabled,
+        'visual': visual,
+        'sound': sound,
+      };
 
   OperationalAlarmRule copyWith({
     String? id,
@@ -197,7 +163,6 @@ class AppSettings {
   });
 
   static const List<int> pollingOptionsSeconds = <int>[1, 5, 10];
-
   static const AppSettings defaults = AppSettings(
     themePreference: AtalayaThemePreference.dark,
     language: AtalayaLanguage.es,
@@ -217,37 +182,27 @@ class AppSettings {
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     final alarmsRaw = json['operationalAlarms'] ?? json['operational_alarms'];
     final alarms = alarmsRaw is List
-        ? alarmsRaw
-            .whereType<Map>()
-            .map((item) => OperationalAlarmRule.fromJson(Map<String, dynamic>.from(item)))
-            .toList(growable: false)
+        ? alarmsRaw.whereType<Map>().map((item) => OperationalAlarmRule.fromJson(Map<String, dynamic>.from(item))).toList(growable: false)
         : defaults.operationalAlarms;
-
-    final polling = _asInt(json['pollingIntervalSeconds'] ?? json['polling_interval_seconds']) ??
-        defaults.pollingIntervalSeconds;
-
+    final polling = _asInt(json['pollingIntervalSeconds'] ?? json['polling_interval_seconds']) ?? defaults.pollingIntervalSeconds;
     return AppSettings(
-      themePreference: AtalayaThemePreference.fromRaw(json['themePreference']?.toString()),
-      language: AtalayaLanguage.fromRaw(json['language']?.toString()),
-      unitSystem: AtalayaUnitSystem.fromRaw(json['unitSystem']?.toString()),
+      themePreference: AtalayaThemePreference.fromRaw(json['themePreference']?.toString() ?? json['theme_preference']?.toString()),
+      language: AtalayaLanguage.fromRaw(json['language']?.toString() ?? json['locale']?.toString() ?? json['appLanguage']?.toString()),
+      unitSystem: AtalayaUnitSystem.fromRaw(json['unitSystem']?.toString() ?? json['unit_system']?.toString()),
       pollingIntervalSeconds: polling <= 0 ? defaults.pollingIntervalSeconds : polling,
-      pushAlertsEnabled: json['pushAlertsEnabled'] is bool
-          ? json['pushAlertsEnabled'] as bool
-          : defaults.pushAlertsEnabled,
+      pushAlertsEnabled: json['pushAlertsEnabled'] is bool ? json['pushAlertsEnabled'] as bool : defaults.pushAlertsEnabled,
       operationalAlarms: alarms,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'themePreference': themePreference.name,
-      'language': language.name,
-      'unitSystem': unitSystem.name,
-      'pollingIntervalSeconds': pollingIntervalSeconds,
-      'pushAlertsEnabled': pushAlertsEnabled,
-      'operationalAlarms': operationalAlarms.map((alarm) => alarm.toJson()).toList(growable: false),
-    };
-  }
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'themePreference': themePreference.name,
+        'language': language.name,
+        'unitSystem': unitSystem.name,
+        'pollingIntervalSeconds': pollingIntervalSeconds,
+        'pushAlertsEnabled': pushAlertsEnabled,
+        'operationalAlarms': operationalAlarms.map((alarm) => alarm.toJson()).toList(growable: false),
+      };
 
   AppSettings copyWith({
     AtalayaThemePreference? themePreference,
