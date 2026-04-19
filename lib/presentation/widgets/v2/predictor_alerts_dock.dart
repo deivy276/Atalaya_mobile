@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/theme/atalaya_theme.dart';
+import '../../../core/theme/layout_tokens.dart';
 import '../../../data/models/alert.dart';
 
 class PredictorAlertsDock extends StatefulWidget {
@@ -21,6 +21,8 @@ class PredictorAlertsDock extends StatefulWidget {
 }
 
 class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
+  static const double _mobileExpandedMaxHeight = 520;
+
   late bool _expanded;
 
   @override
@@ -30,115 +32,433 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
   }
 
   @override
+  void didUpdateWidget(covariant PredictorAlertsDock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.alerts.length < oldWidget.alerts.length && widget.alerts.isEmpty) {
+      _expanded = widget.embedded;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final colors = context.atalayaColors;
     final alerts = widget.alerts;
-    final visibleAlerts = alerts.take(_expanded ? 5 : 1).toList(growable: false);
+    final visibleAlerts = _expanded ? alerts : alerts.take(1).toList(growable: false);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: colors.card.withValues(alpha: widget.embedded ? 0.98 : 0.94),
+        color: widget.embedded ? const Color(0xEE0A162A) : const Color(0xEE081427),
         borderRadius: widget.embedded
             ? BorderRadius.circular(22)
             : const BorderRadius.vertical(top: Radius.circular(22)),
-        border: Border.all(color: colors.border),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: colors.shadow,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        border: Border.all(color: LayoutTokens.dividerSubtle),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  'Predictor KPIs & Alerts',
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
+      child: widget.embedded
+          ? Column(
+              children: <Widget>[
+                _AlertsHeader(
+                  count: alerts.length,
+                  expanded: _expanded,
+                  onToggleExpanded: alerts.isEmpty ? null : _toggleExpanded,
+                  onOpenAll: alerts.isEmpty ? null : () => _openAllAlertsSheet(context),
                 ),
-              ),
-              Text('${alerts.length}', style: TextStyle(color: colors.textSecondary)),
-              if (alerts.isNotEmpty)
-                IconButton(
-                  onPressed: () => setState(() => _expanded = !_expanded),
-                  icon: Icon(
-                    _expanded ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-                    color: colors.textSecondary,
-                  ),
-                ),
-            ],
-          ),
-          if (alerts.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'No hay alertas activas',
-                style: TextStyle(color: colors.textMuted),
-              ),
-            ),
-          for (final alert in visibleAlerts)
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: colors.plot,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _severityColor(alert.severity, colors).withValues(alpha: 0.72)),
-              ),
-              child: Row(
-                children: <Widget>[
+                if (alerts.isEmpty)
+                  const Expanded(child: _EmptyAlertsState())
+                else
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Predictor · ${DateFormat('HH:mm').format(alert.createdAt.toLocal())}',
-                          style: TextStyle(color: colors.textMuted, fontSize: 11),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          alert.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+                    child: _AlertsList(
+                      alerts: visibleAlerts,
+                      onOpenAlert: _openAlertFromList,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  FilledButton(
-                    onPressed: () => widget.onOpenAlert?.call(alert),
-                    child: const Text('VER'),
+              ],
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                _AlertsHeader(
+                  count: alerts.length,
+                  expanded: _expanded,
+                  onToggleExpanded: alerts.isEmpty ? null : _toggleExpanded,
+                  onOpenAll: alerts.isEmpty ? null : () => _openAllAlertsSheet(context),
+                ),
+                if (alerts.isEmpty)
+                  const _EmptyAlertsState()
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: _expanded ? _mobileExpandedMaxHeight : 116,
+                    ),
+                    child: _AlertsList(
+                      alerts: visibleAlerts,
+                      onOpenAlert: _openAlertFromList,
+                    ),
+                  ),
+                if (alerts.length > 1) ...<Widget>[
+                  const SizedBox(height: 10),
+                  _OpenAllAlertsButton(
+                    count: alerts.length,
+                    onPressed: () => _openAllAlertsSheet(context),
                   ),
                 ],
+              ],
+            ),
+    );
+  }
+
+  void _toggleExpanded() {
+    setState(() => _expanded = !_expanded);
+  }
+
+  void _openAlertFromList(AtalayaAlert alert) {
+    widget.onOpenAlert?.call(alert);
+  }
+
+  Future<void> _openAllAlertsSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: const Color(0xFF081427),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.92,
+          child: _AllAlertsSheet(
+            alerts: widget.alerts,
+            onOpenAlert: (alert) {
+              Navigator.of(sheetContext).pop();
+              Future<void>.microtask(() => widget.onOpenAlert?.call(alert));
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AlertsHeader extends StatelessWidget {
+  const _AlertsHeader({
+    required this.count,
+    required this.expanded,
+    required this.onToggleExpanded,
+    required this.onOpenAll,
+  });
+
+  final int count;
+  final bool expanded;
+  final VoidCallback? onToggleExpanded;
+  final VoidCallback? onOpenAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        const Expanded(
+          child: Text(
+            'Predictor KPIs & Alerts',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: LayoutTokens.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        Semantics(
+          label: '$count alertas activas',
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: LayoutTokens.surfaceCard,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: LayoutTokens.dividerSubtle),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                color: LayoutTokens.textSecondary,
+                fontWeight: FontWeight.w700,
               ),
             ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        if (count > 0)
+          IconButton(
+            tooltip: expanded ? 'Mostrar menos' : 'Mostrar más',
+            onPressed: onToggleExpanded,
+            icon: Icon(
+              expanded ? Icons.expand_more_rounded : Icons.expand_less_rounded,
+              color: LayoutTokens.textSecondary,
+            ),
+          ),
+        if (count > 1)
+          IconButton(
+            tooltip: 'Ver todas las alertas',
+            onPressed: onOpenAll,
+            icon: const Icon(
+              Icons.open_in_full_rounded,
+              color: LayoutTokens.textSecondary,
+              size: 20,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _OpenAllAlertsButton extends StatelessWidget {
+  const _OpenAllAlertsButton({
+    required this.count,
+    required this.onPressed,
+  });
+
+  final int count;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.list_alt_rounded, size: 18),
+        label: Text('Ver las $count alertas'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: LayoutTokens.accentBlue,
+          side: const BorderSide(color: LayoutTokens.accentBlue),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+    );
+  }
+}
+
+class _AlertsList extends StatelessWidget {
+  const _AlertsList({
+    required this.alerts,
+    required this.onOpenAlert,
+  });
+
+  final List<AtalayaAlert> alerts;
+  final ValueChanged<AtalayaAlert> onOpenAlert;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.only(top: 8),
+      shrinkWrap: true,
+      physics: const ClampingScrollPhysics(),
+      itemCount: alerts.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) => _AlertCard(
+        alert: alerts[index],
+        onOpen: () => onOpenAlert(alerts[index]),
+      ),
+    );
+  }
+}
+
+class _AlertCard extends StatelessWidget {
+  const _AlertCard({
+    required this.alert,
+    required this.onOpen,
+    this.compact = false,
+  });
+
+  final AtalayaAlert alert;
+  final VoidCallback onOpen;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _severityColor(alert.severity);
+
+    return Container(
+      padding: EdgeInsets.all(compact ? 10 : 12),
+      decoration: BoxDecoration(
+        color: LayoutTokens.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.72)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: color.withValues(alpha: 0.75)),
+                      ),
+                      child: Text(
+                        alert.severity.compactLabel,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Predictor · ${DateFormat('dd/MM HH:mm').format(alert.createdAt.toLocal())}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: LayoutTokens.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  alert.description,
+                  maxLines: compact ? 2 : 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: LayoutTokens.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    height: 1.22,
+                    fontSize: compact ? 13 : 14,
+                  ),
+                ),
+                if (alert.attachmentsCount > 0) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    '${alert.attachmentsCount} adjunto${alert.attachmentsCount == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      color: LayoutTokens.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton(
+            onPressed: onOpen,
+            child: const Text('VER'),
+          ),
         ],
       ),
     );
   }
 
-  Color _severityColor(AlertSeverity severity, AtalayaThemeColors colors) {
+  Color _severityColor(AlertSeverity severity) {
     switch (severity) {
       case AlertSeverity.critical:
-        return colors.danger;
+        return LayoutTokens.accentRed;
       case AlertSeverity.attention:
-        return colors.warning;
+        return LayoutTokens.accentOrange;
       case AlertSeverity.ok:
-        return colors.primary;
+        return LayoutTokens.accentBlue;
     }
+  }
+}
+
+class _AllAlertsSheet extends StatelessWidget {
+  const _AllAlertsSheet({
+    required this.alerts,
+    required this.onOpenAlert,
+  });
+
+  final List<AtalayaAlert> alerts;
+  final ValueChanged<AtalayaAlert> onOpenAlert;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Center(
+            child: Container(
+              width: 52,
+              height: 5,
+              decoration: BoxDecoration(
+                color: LayoutTokens.textMuted.withValues(alpha: 0.62),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  'Alertas del Predictor (${alerts.length})',
+                  style: const TextStyle(
+                    color: LayoutTokens.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Cerrar',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded, color: LayoutTokens.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Listado completo de alarmas y notas generadas. Desplázate para revisar todas.',
+            style: TextStyle(color: LayoutTokens.textMuted),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: alerts.isEmpty
+                ? const _EmptyAlertsState()
+                : ListView.separated(
+                    itemCount: alerts.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final alert = alerts[index];
+                      return _AlertCard(
+                        alert: alert,
+                        compact: false,
+                        onOpen: () => onOpenAlert(alert),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyAlertsState extends StatelessWidget {
+  const _EmptyAlertsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 18, bottom: 12),
+      child: Center(
+        child: Text(
+          'No hay alertas activas',
+          style: TextStyle(color: LayoutTokens.textMuted),
+        ),
+      ),
+    );
   }
 }
