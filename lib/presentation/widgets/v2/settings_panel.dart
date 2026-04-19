@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/security/session_secure_storage.dart';
 import '../../../core/theme/layout_tokens.dart';
+import '../../../core/theme/pro_palette.dart';
 import '../../../data/models/app_settings.dart';
 import '../../../data/models/well_variable.dart';
 import '../../providers/alert_settings_controller.dart';
@@ -107,11 +108,8 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
                   title: 'Preferencias de interfaz',
                   icon: Icons.palette_outlined,
                   children: <Widget>[
-                    _SettingsSegmentedRow<AtalayaThemePreference>(
-                      label: 'Tema visual',
+                    _ThemePreferenceSelector(
                       selected: appSettings.themePreference,
-                      values: AtalayaThemePreference.values,
-                      labelBuilder: (value) => value.label,
                       onChanged: ref.read(appSettingsControllerProvider.notifier).setThemePreference,
                     ),
                     _SettingsSegmentedRow<AtalayaLanguage>(
@@ -324,6 +322,196 @@ class _SettingsSection extends StatelessWidget {
           ...children,
         ],
       ),
+    );
+  }
+}
+
+class _ThemePreferenceSelector extends StatelessWidget {
+  const _ThemePreferenceSelector({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final AtalayaThemePreference selected;
+  final ValueChanged<AtalayaThemePreference> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = Theme.of(context).extension<AtalayaVisualPalette>() ?? AtalayaVisualPalette.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Tema visual',
+            style: TextStyle(color: visual.textSecondary, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Selecciona la paleta de operación. Sistema aplica automáticamente oscuro o claro según Android/iOS.',
+            style: TextStyle(color: visual.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          Column(
+            children: AtalayaThemePreference.values.map((item) {
+              return _ThemePreferenceTile(
+                preference: item,
+                selected: selected == item,
+                onTap: () => onChanged(item),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemePreferenceTile extends StatelessWidget {
+  const _ThemePreferenceTile({
+    required this.preference,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AtalayaThemePreference preference;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = Theme.of(context).extension<AtalayaVisualPalette>() ?? AtalayaVisualPalette.dark;
+    final preview = switch (preference) {
+      AtalayaThemePreference.dark => AtalayaVisualPalette.dark,
+      AtalayaThemePreference.light => AtalayaVisualPalette.light,
+      AtalayaThemePreference.system => MediaQuery.platformBrightnessOf(context) == Brightness.dark
+          ? AtalayaVisualPalette.dark
+          : AtalayaVisualPalette.light,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: selected ? current.primary.withValues(alpha: 0.12) : current.plotArea,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? current.primary : current.grid,
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              _ThemePreviewSwatch(palette: preview),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Icon(preference.icon, size: 18, color: selected ? current.primary : current.textSecondary),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            preference.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: current.textPrimary, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      preference.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: current.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 140),
+                child: selected
+                    ? Icon(Icons.check_circle_rounded, key: const ValueKey('selected'), color: current.primary)
+                    : Icon(Icons.circle_outlined, key: const ValueKey('idle'), color: current.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemePreviewSwatch extends StatelessWidget {
+  const _ThemePreviewSwatch({required this.palette});
+
+  final AtalayaVisualPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 74,
+      height: 52,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: palette.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.grid),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: double.infinity,
+            height: 12,
+            decoration: BoxDecoration(
+              color: palette.card,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const Spacer(),
+          Row(
+            children: <Widget>[
+              _SwatchDot(color: palette.primary),
+              const SizedBox(width: 4),
+              _SwatchDot(color: palette.curveSecondaryA),
+              const SizedBox(width: 4),
+              _SwatchDot(color: palette.curveSecondaryB),
+              const Spacer(),
+              _SwatchDot(color: palette.scatter.withValues(alpha: 0.60), size: 8),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwatchDot extends StatelessWidget {
+  const _SwatchDot({required this.color, this.size = 7});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

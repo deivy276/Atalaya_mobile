@@ -2,13 +2,27 @@ import 'package:flutter/material.dart';
 
 /// High-level UI/theme preference persisted locally on the device.
 enum AtalayaThemePreference {
-  system('Sistema'),
-  dark('Oscuro'),
-  light('Claro');
+  system(
+    'Sistema',
+    'Sigue automáticamente el tema del dispositivo.',
+    Icons.phone_android_rounded,
+  ),
+  dark(
+    'Oscuro',
+    'Azules medianoche para reducir fatiga visual en campo.',
+    Icons.dark_mode_rounded,
+  ),
+  light(
+    'Claro',
+    'Grises neutros de alto contraste para ambientes iluminados.',
+    Icons.light_mode_rounded,
+  );
 
-  const AtalayaThemePreference(this.label);
+  const AtalayaThemePreference(this.label, this.description, this.icon);
 
   final String label;
+  final String description;
+  final IconData icon;
 
   ThemeMode get themeMode {
     switch (this) {
