@@ -7,12 +7,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/constants/trend_range.dart';
 import '../../core/theme/layout_tokens.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/alert.dart';
+import '../../data/models/trend_point.dart';
 import '../../data/models/well_variable.dart';
 import '../models/dashboard_ui_model.dart';
 import '../providers/dashboard_controller.dart';
+import '../providers/trend_controller.dart';
 import '../providers/unit_preferences_controller.dart';
 import 'predictor_charts_screen.dart';
 import '../widgets/v2/brand_top_bar.dart';
@@ -746,7 +749,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
 }
 
-class _VariableTrendSheet extends StatelessWidget {
+class _VariableTrendSheet extends ConsumerStatefulWidget {
   const _VariableTrendSheet({
     required this.variable,
     required this.tile,
@@ -756,10 +759,33 @@ class _VariableTrendSheet extends StatelessWidget {
   final VariableTileUiModel tile;
 
   @override
+  ConsumerState<_VariableTrendSheet> createState() => _VariableTrendSheetState();
+}
+
+class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
+  TrendRange _selectedRange = TrendRange.m30;
+
+  static const List<TrendRange> _ranges = <TrendRange>[
+    TrendRange.m30,
+    TrendRange.h2,
+    TrendRange.h6,
+    TrendRange.h8,
+    TrendRange.h12,
+    TrendRange.h24,
+  ];
+
+  @override
   Widget build(BuildContext context) {
-    final series = tile.trendSeries;
-    final hasChart = series.length >= 2;
+    final variable = widget.variable;
+    final tile = widget.tile;
     final accentColor = tile.accentColor;
+    final request = TrendRequest(
+      tag: variable.tag,
+      rawUnit: variable.rawUnit,
+      displayUnit: tile.unitText,
+      range: _selectedRange,
+    );
+    final trendAsync = ref.watch(trendSeriesProvider(request));
 
     return Container(
       decoration: const BoxDecoration(
@@ -824,60 +850,60 @@ class _VariableTrendSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: LayoutTokens.surfaceCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: LayoutTokens.dividerSubtle),
+              trendAsync.when(
+                loading: () => _VariableValueSummary(
+                  valueText: tile.valueText,
+                  unitText: tile.unitText,
+                  deltaText: tile.deltaText,
+                  accentColor: accentColor,
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: <Widget>[
-                    Expanded(
-                      child: RichText(
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        text: TextSpan(
-                          text: tile.valueText,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 36,
-                            fontWeight: FontWeight.w700,
-                            height: 1,
-                          ),
-                          children: <InlineSpan>[
-                            TextSpan(
-                              text: tile.unitText.isEmpty ? '' : ' ${tile.unitText}',
-                              style: const TextStyle(
-                                color: LayoutTokens.textSecondary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Text(
-                      tile.deltaText,
-                      style: TextStyle(
-                        color: accentColor,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                error: (_, __) => _VariableValueSummary(
+                  valueText: tile.valueText,
+                  unitText: tile.unitText,
+                  deltaText: tile.deltaText,
+                  accentColor: accentColor,
+                ),
+                data: (trend) => _VariableValueSummary(
+                  valueText: UnitConverter.formatNumber(trend.yLast),
+                  unitText: trend.displayUnit,
+                  deltaText: _deltaTextForPoints(trend.points),
+                  accentColor: _deltaForPoints(trend.points) < 0
+                      ? LayoutTokens.accentOrange
+                      : LayoutTokens.accentGreen,
                 ),
               ),
+              const SizedBox(height: 12),
+              _VariableRangeSelector(
+                ranges: _ranges,
+                selected: _selectedRange,
+                onSelected: (range) => setState(() => _selectedRange = range),
+              ),
               const SizedBox(height: 14),
-              const Text(
-                'Gráfica de variable',
-                style: TextStyle(
-                  color: LayoutTokens.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
+              Row(
+                children: <Widget>[
+                  const Expanded(
+                    child: Text(
+                      'Gráfica de variable',
+                      style: TextStyle(
+                        color: LayoutTokens.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  trendAsync.maybeWhen(
+                    data: (trend) => Text(
+                      trend.rangeText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: LayoutTokens.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Expanded(
@@ -889,23 +915,47 @@ class _VariableTrendSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: LayoutTokens.dividerSubtle),
                   ),
-                  child: hasChart
-                      ? _VariableLineChart(
-                          series: series,
-                          unit: tile.unitText,
-                          color: accentColor,
-                        )
-                      : const _NoVariableChartData(),
+                  child: trendAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (error, _) => _VariableChartError(
+                      message: error.toString(),
+                      onRetry: () => ref.invalidate(trendSeriesProvider(request)),
+                    ),
+                    data: (trend) => trend.points.length >= 2
+                        ? _VariableTimeLineChart(
+                            points: trend.points,
+                            unit: trend.displayUnit,
+                            color: accentColor,
+                            range: _selectedRange,
+                          )
+                        : const _NoVariableChartData(),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                hasChart
-                    ? '${series.length} muestras recientes · solo lectura'
-                    : 'Aún no hay suficientes muestras para graficar esta variable.',
-                style: const TextStyle(
-                  color: LayoutTokens.textMuted,
-                  fontSize: 12,
+              trendAsync.when(
+                loading: () => Text(
+                  'Cargando ${_selectedRange.displayLabel} · solo lectura',
+                  style: const TextStyle(
+                    color: LayoutTokens.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+                error: (_, __) => Text(
+                  'No fue posible cargar ${_selectedRange.displayLabel}.',
+                  style: const TextStyle(
+                    color: LayoutTokens.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+                data: (trend) => Text(
+                  trend.points.length >= 2
+                      ? '${trend.points.length} muestras · ${_selectedRange.displayLabel} · eje X en tiempo · solo lectura'
+                      : 'Aún no hay suficientes muestras para ${_selectedRange.displayLabel}.',
+                  style: const TextStyle(
+                    color: LayoutTokens.textMuted,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -914,42 +964,185 @@ class _VariableTrendSheet extends StatelessWidget {
       ),
     );
   }
+
+  double _deltaForPoints(List<TrendPoint> points) {
+    if (points.length < 2) {
+      return 0;
+    }
+    final first = points.first.value;
+    final last = points.last.value;
+    if (first == 0) {
+      return 0;
+    }
+    return ((last - first) / first) * 100;
+  }
+
+  String _deltaTextForPoints(List<TrendPoint> points) {
+    final delta = _deltaForPoints(points);
+    final arrow = delta >= 0 ? '↗' : '↘';
+    final sign = delta >= 0 ? '+' : '';
+    return '$arrow $sign${delta.toStringAsFixed(1)}%';
+  }
 }
 
-class _VariableLineChart extends StatelessWidget {
-  const _VariableLineChart({
-    required this.series,
-    required this.unit,
-    required this.color,
+class _VariableRangeSelector extends StatelessWidget {
+  const _VariableRangeSelector({
+    required this.ranges,
+    required this.selected,
+    required this.onSelected,
   });
 
-  final List<double> series;
-  final String unit;
-  final Color color;
+  final List<TrendRange> ranges;
+  final TrendRange selected;
+  final ValueChanged<TrendRange> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final minValue = series.reduce((a, b) => a < b ? a : b);
-    final maxValue = series.reduce((a, b) => a > b ? a : b);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: ranges.map((range) {
+        final isSelected = selected == range;
+        return ChoiceChip(
+          label: Text(range.displayLabel),
+          selected: isSelected,
+          showCheckmark: false,
+          selectedColor: LayoutTokens.accentBlue.withValues(alpha: 0.20),
+          backgroundColor: LayoutTokens.surfaceCard,
+          side: BorderSide(
+            color: isSelected
+                ? LayoutTokens.accentBlue.withValues(alpha: 0.72)
+                : LayoutTokens.dividerSubtle,
+          ),
+          labelStyle: TextStyle(
+            color: isSelected ? Colors.white : LayoutTokens.textSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+          onSelected: (_) => onSelected(range),
+        );
+      }).toList(growable: false),
+    );
+  }
+}
+
+class _VariableValueSummary extends StatelessWidget {
+  const _VariableValueSummary({
+    required this.valueText,
+    required this.unitText,
+    required this.deltaText,
+    required this.accentColor,
+  });
+
+  final String valueText;
+  final String unitText;
+  final String deltaText;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: LayoutTokens.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: LayoutTokens.dividerSubtle),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: <Widget>[
+          Expanded(
+            child: RichText(
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(
+                text: valueText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+                children: <InlineSpan>[
+                  TextSpan(
+                    text: unitText.isEmpty ? '' : ' $unitText',
+                    style: const TextStyle(
+                      color: LayoutTokens.textSecondary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Text(
+            deltaText,
+            style: TextStyle(
+              color: accentColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VariableTimeLineChart extends StatelessWidget {
+  const _VariableTimeLineChart({
+    required this.points,
+    required this.unit,
+    required this.color,
+    required this.range,
+  });
+
+  final List<TrendPoint> points;
+  final String unit;
+  final Color color;
+  final TrendRange range;
+
+  @override
+  Widget build(BuildContext context) {
+    final ordered = List<TrendPoint>.from(points)
+      ..sort((left, right) => left.timestamp.compareTo(right.timestamp));
+    final values = ordered.map((point) => point.value).toList(growable: false);
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
     final span = (maxValue - minValue).abs();
     final padding = span < 0.01 ? 1.0 : span * 0.18;
-    final spots = List<FlSpot>.generate(
-      series.length,
-      (int index) => FlSpot(index.toDouble(), series[index]),
-    );
+    final spots = ordered
+        .map(
+          (point) => FlSpot(
+            point.timestamp.toUtc().millisecondsSinceEpoch / 1000,
+            point.value,
+          ),
+        )
+        .toList(growable: false);
+    final minX = spots.first.x;
+    final maxX = spots.last.x;
+    final xSpan = math.max(1, maxX - minX);
+    final xInterval = math.max(60, xSpan / 4).toDouble();
 
     return LineChart(
       LineChartData(
-        minX: 0,
-        maxX: (series.length - 1).toDouble(),
+        minX: minX,
+        maxX: maxX,
         minY: minValue - padding,
         maxY: maxValue + padding,
         borderData: FlBorderData(show: false),
         gridData: FlGridData(
           show: true,
-          drawVerticalLine: false,
+          drawVerticalLine: true,
+          verticalInterval: xInterval,
           getDrawingHorizontalLine: (_) => const FlLine(
             color: Color(0x334A6D96),
+            strokeWidth: 1,
+          ),
+          getDrawingVerticalLine: (_) => const FlLine(
+            color: Color(0x1F4A6D96),
             strokeWidth: 1,
           ),
         ),
@@ -957,15 +1150,28 @@ class _VariableLineChart extends StatelessWidget {
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
+            axisNameWidget: const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Tiempo',
+                style: TextStyle(
+                  color: LayoutTokens.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 24,
-              interval: math.max(1, (series.length / 4).floor()).toDouble(),
+              reservedSize: 32,
+              interval: xInterval,
               getTitlesWidget: (value, meta) => Text(
-                value.round().toString(),
+                _formatAxisTime(value),
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: LayoutTokens.textMuted,
                   fontSize: 10,
+                  height: 1.1,
                 ),
               ),
             ),
@@ -1003,8 +1209,14 @@ class _VariableLineChart extends StatelessWidget {
             getTooltipItems: (spots) {
               return spots.map((spot) {
                 final value = UnitConverter.formatNumber(spot.y);
+                final timestamp = DateTime.fromMillisecondsSinceEpoch(
+                  (spot.x * 1000).round(),
+                  isUtc: true,
+                ).toLocal();
+                final time = DateFormat('dd/MM HH:mm').format(timestamp);
+                final formattedValue = unit.isEmpty ? value : '$value $unit';
                 return LineTooltipItem(
-                  unit.isEmpty ? value : '$value $unit',
+                  '$formattedValue\n$time',
                   const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -1041,37 +1253,67 @@ class _VariableLineChart extends StatelessWidget {
       ),
     );
   }
+
+  String _formatAxisTime(double epochSeconds) {
+    final timestamp = DateTime.fromMillisecondsSinceEpoch(
+      (epochSeconds * 1000).round(),
+      isUtc: true,
+    ).toLocal();
+
+    if (range == TrendRange.h24) {
+      return DateFormat('dd/MM\nHH:mm').format(timestamp);
+    }
+
+    return DateFormat('HH:mm').format(timestamp);
+  }
 }
 
-class _NoVariableChartData extends StatelessWidget {
-  const _NoVariableChartData();
+class _VariableChartError extends StatelessWidget {
+  const _VariableChartError({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(Icons.show_chart_rounded, color: LayoutTokens.textMuted, size: 34),
-          SizedBox(height: 10),
-          Text(
-            'No hay suficientes datos para graficar',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: LayoutTokens.textSecondary,
-              fontWeight: FontWeight.w700,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(Icons.cloud_off_rounded, color: LayoutTokens.textMuted, size: 34),
+            const SizedBox(height: 10),
+            const Text(
+              'No se pudo cargar el histórico.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: LayoutTokens.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'La gráfica se activará cuando llegue más historial.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: LayoutTokens.textMuted,
-              fontSize: 12,
+            const SizedBox(height: 6),
+            Text(
+              message,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: LayoutTokens.textMuted,
+                fontSize: 11,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
       ),
     );
   }

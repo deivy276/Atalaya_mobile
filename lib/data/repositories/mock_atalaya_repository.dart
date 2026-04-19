@@ -60,20 +60,18 @@ class MockAtalayaRepository implements AtalayaRepository {
       TrendRange.m30 => 18,
       TrendRange.h2 => 30,
       TrendRange.h6 => 45,
+      TrendRange.h8 => 54,
+      TrendRange.h12 => 72,
+      TrendRange.h24 => 96,
     };
 
-    final stepMinutes = switch (range) {
-      TrendRange.m30 => 2,
-      TrendRange.h2 => 4,
-      TrendRange.h6 => 8,
-    };
-
+    final stepSeconds = max(1, range.duration.inSeconds ~/ max(1, pointCount - 1));
     final baseline = _baselineForTag(tag);
     final rng = Random(tag.hashCode.abs());
 
     return List<TrendPoint>.generate(pointCount, (index) {
-      final offset = pointCount - index;
-      final timestamp = now.subtract(Duration(minutes: offset * stepMinutes));
+      final remainingSteps = pointCount - 1 - index;
+      final timestamp = now.subtract(Duration(seconds: remainingSteps * stepSeconds));
       final wave = sin(index / 3.6) * (baseline * 0.06);
       final noise = (rng.nextDouble() - 0.5) * (baseline * 0.02);
       final drift = (index / pointCount) * (baseline * 0.03);
