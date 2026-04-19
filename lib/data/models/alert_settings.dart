@@ -15,8 +15,8 @@ class AlertSettings {
   static const AlertSettings defaults = AlertSettings(
     enabled: true,
     visual: true,
-    sound: false,
-    vibrate: false,
+    sound: true,
+    vibrate: true,
     minSeverity: AlertSeverity.attention,
     quietHours: false,
     quietStart: '22:00',

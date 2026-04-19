@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +12,7 @@ import '../../../data/models/well_variable.dart';
 import '../../providers/alert_settings_controller.dart';
 import '../../providers/app_settings_controller.dart';
 import '../../providers/dashboard_controller.dart';
+import '../../services/atalaya_alarm_feedback.dart';
 
 class AtalayaSettingsPanel extends ConsumerStatefulWidget {
   const AtalayaSettingsPanel({super.key, this.onLogout, this.onOpenLayoutControls});
@@ -157,7 +158,32 @@ class _AtalayaSettingsPanelState extends ConsumerState<AtalayaSettingsPanel> {
                       activeColor: colors.safe,
                       title: Text(text.soundAlert, style: TextStyle(color: colors.textPrimary)),
                       subtitle: Text(text.soundAlertSubtitle, style: TextStyle(color: colors.textSecondary)),
-                      onChanged: ref.read(alertSettingsControllerProvider.notifier).setSound,
+                      onChanged: (value) async {
+                        await ref.read(alertSettingsControllerProvider.notifier).setSound(value);
+                        if (value && context.mounted) {
+                          await AtalayaAlarmFeedback.playStandardAlarmSound(vibrate: ref.read(alertSettingsControllerProvider).vibrate);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Sonido estÃ¡ndar de alarma activado.')),
+                          );
+                        }
+                      },
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          await AtalayaAlarmFeedback.playStandardAlarmSound(
+                            vibrate: ref.read(alertSettingsControllerProvider).vibrate,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Prueba de alarma sonora enviada.')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.volume_up_rounded),
+                        label: const Text('Probar sonido de alarma'),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _AlarmEditor(
@@ -651,7 +677,7 @@ class _AlarmList extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(alarm.variableLabel, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w700)),
-                    Text('${alarm.operator.symbol} $threshold · ${text.soundLabel(alarm.sound)}', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+                    Text('${alarm.operator.symbol} $threshold Â· ${text.soundLabel(alarm.sound)}', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
                   ],
                 ),
               ),
@@ -743,3 +769,4 @@ class _UserProfileCard extends StatelessWidget {
     return null;
   }
 }
+

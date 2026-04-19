@@ -19,8 +19,11 @@ import '../models/dashboard_ui_model.dart';
 import '../providers/dashboard_controller.dart';
 import '../providers/trend_controller.dart';
 import '../providers/unit_preferences_controller.dart';
+import '../providers/operational_alarm_events_provider.dart';
 import '../providers/app_settings_controller.dart';
+import '../providers/alert_settings_controller.dart';
 import 'predictor_charts_screen.dart';
+import '../services/atalaya_alarm_feedback.dart';
 import '../widgets/v2/brand_top_bar.dart';
 import '../widgets/v2/kpi_tile_v2.dart';
 import '../widgets/v2/predictor_alerts_dock.dart';
@@ -43,6 +46,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   String? _selectedVariableTag;
   _DensityMode _densityMode = _DensityMode.comfortable;
   _TileLayoutMode _tileLayoutMode = _TileLayoutMode.grid;
+  final Set<String> _activeOperationalAlarmRuleIds = <String>{};
 
   bool get _isDefaultLayoutConfig =>
       _densityMode == _DensityMode.comfortable && _tileLayoutMode == _TileLayoutMode.grid;
@@ -55,6 +59,11 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<List<OperationalAlarmEvent>>(
+      operationalAlarmEventsProvider,
+      (previous, next) => _handleOperationalAlarmEvents(next),
+    );
+
     final dashboardAsync = ref.watch(dashboardControllerProvider);
     final unitPrefs = ref.watch(unitPreferencesControllerProvider);
     final appSettings = ref.watch(appSettingsControllerProvider);
@@ -538,6 +547,46 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     return TileVisualStatus.normal;
   }
 
+  void _handleOperationalAlarmEvents(List<OperationalAlarmEvent> events) {
+    final currentActiveIds = events.map((event) => event.ruleId).toSet();
+    OperationalAlarmEvent? newEvent;
+
+    for (final event in events) {
+      if (!_activeOperationalAlarmRuleIds.contains(event.ruleId)) {
+        newEvent = event;
+        break;
+      }
+    }
+
+    _activeOperationalAlarmRuleIds
+      ..clear()
+      ..addAll(currentActiveIds);
+
+    if (newEvent == null) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _presentOperationalAlarm(newEvent!);
+      }
+    });
+  }
+
+  Future<void> _presentOperationalAlarm(OperationalAlarmEvent event) async {
+    final settings = ref.read(alertSettingsControllerProvider);
+    if (!settings.enabled) {
+      return;
+    }
+
+    await AtalayaAlarmFeedback.presentOperationalAlarm(
+      context,
+      event,
+      visual: event.rule.visual || settings.visual,
+      sound: event.rule.sound || settings.sound,
+      vibrate: settings.vibrate || event.rule.sound,
+    );
+  }
   Future<void> _openAlertDetail(AtalayaAlert alert) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1684,6 +1733,7 @@ class _EmptyKpiState extends StatelessWidget {
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }
+
 
 
 
