@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -42,6 +42,7 @@ class DashboardV2Screen extends ConsumerStatefulWidget {
 class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   static const String _densityPrefKey = 'dashboard_v2_density_mode';
   static const String _layoutPrefKey = 'dashboard_v2_tile_layout_mode';
+  static const int _dashboardVariableSlots = 12;
 
   String? _selectedVariableTag;
   _DensityMode _densityMode = _DensityMode.comfortable;
@@ -223,10 +224,14 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       }
 
       final model = uiModel.tiles[index];
-      final variable = viewState.payload.variables.firstWhere(
-        (WellVariable item) => item.tag == model.id,
-        orElse: () => WellVariable.empty(index + 1),
-      );
+      final variable = _variableForTile(viewState.payload.variables, model.id);
+
+      if (!model.isTappable) {
+        return _InactiveVariableTile(
+          slot: variable.slot,
+          label: model.label,
+        );
+      }
 
       return KpiTileV2(
         label: model.label,
@@ -237,6 +242,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         selected: model.isSelected,
         accentColor: model.accentColor,
         onTap: () {
+          if (!model.isTappable) return;
           setState(() => _selectedVariableTag = model.id);
           _openVariableTrend(variable: variable, tile: model);
         },
@@ -300,6 +306,73 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     return null;
   }
 
+
+  List<WellVariable> _dashboardVariablesForPayload(List<WellVariable> variables) {
+    final bySlot = <int, WellVariable>{};
+    final unassigned = <WellVariable>[];
+
+    for (final variable in variables) {
+      final slot = variable.slot;
+      if (slot >= 1 && slot <= _dashboardVariableSlots) {
+        bySlot[slot] = variable;
+      } else if (variable.tag.trim().isNotEmpty) {
+        unassigned.add(variable);
+      }
+    }
+
+    var nextUnassignedIndex = 0;
+    return List<WellVariable>.generate(_dashboardVariableSlots, (index) {
+      final slot = index + 1;
+      final configured = bySlot[slot];
+      if (configured != null) return configured;
+
+      while (nextUnassignedIndex < unassigned.length) {
+        final candidate = unassigned[nextUnassignedIndex++];
+        final normalizedCandidate = WellVariable(
+          slot: slot,
+          label: candidate.label,
+          tag: candidate.tag,
+          rawUnit: candidate.rawUnit,
+          value: candidate.value,
+          rawTextValue: candidate.rawTextValue,
+          sampleAt: candidate.sampleAt,
+          configured: candidate.configured,
+        );
+        return normalizedCandidate;
+      }
+
+      return WellVariable.empty(slot);
+    }, growable: false);
+  }
+
+  String _inactiveTileId(int slot) => '__inactive_variable_slot_$slot';
+
+  int _inactiveSlotFromId(String id) {
+    final marker = RegExp(r'__inactive_variable_slot_(\d+)').firstMatch(id);
+    if (marker == null) return 0;
+    return int.tryParse(marker.group(1) ?? '') ?? 0;
+  }
+
+  WellVariable _variableForTile(List<WellVariable> variables, String tileId) {
+    for (final variable in variables) {
+      if (variable.tag == tileId) {
+        return variable;
+      }
+    }
+
+    final inactiveSlot = _inactiveSlotFromId(tileId);
+    if (inactiveSlot > 0) {
+      for (final variable in variables) {
+        if (variable.slot == inactiveSlot) {
+          return variable;
+        }
+      }
+      return WellVariable.empty(inactiveSlot);
+    }
+
+    return WellVariable.empty(0);
+  }
+
   Future<void> _loadLayoutPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -358,7 +431,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Restablecer layout'),
-          content: const Text('Â¿Quieres volver a la configuraciÃ³n visual predeterminada?'),
+          content: const Text('¿Quieres volver a la configuración visual predeterminada?'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -444,7 +517,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
           'flow' => 'gpm',
           'force' => 'lbs',
           'torque' => 'ft-lbf',
-          'temperature' => 'Â°F',
+          'temperature' => '°F',
           _ => null,
         };
       case AtalayaUnitSystem.metric:
@@ -454,8 +527,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
           'velocity' => 'm/min',
           'flow' => 'lpm',
           'force' => 'kgf',
-          'torque' => 'NÂ·m',
-          'temperature' => 'Â°C',
+          'torque' => 'N·m',
+          'temperature' => '°C',
           _ => null,
         };
     }
@@ -465,51 +538,59 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     Map<String, String> unitPreferences,
   ) {
     final payload = state.payload;
+    final dashboardVariables = _dashboardVariablesForPayload(payload.variables);
 
-    final tiles = payload.variables.take(6).map((variable) {
-      final displayUnit = UnitConverter.resolveDisplayUnit(
-        slotIndex: variable.slot - 1,
-        tag: variable.tag,
-        rawUnit: variable.rawUnit,
-        well: payload.well,
-        job: payload.job,
-        preferences: unitPreferences,
-      );
+    final tiles = dashboardVariables.map((variable) {
+      final isConfigured = variable.configured && variable.tag.trim().isNotEmpty;
+      final slotIndex = variable.slot <= 0 ? 0 : variable.slot - 1;
 
-      final converted = variable.value == null
-          ? null
-          : UnitConverter.convertValue(variable.value!, variable.rawUnit, displayUnit);
-      final rawSparkline = state.variableHistoryByTag[variable.tag] ?? const <double>[];
-      final sparkline = rawSparkline
-          .map((value) => UnitConverter.convertValue(value, variable.rawUnit, displayUnit))
-          .toList(growable: false);
+      final displayUnit = isConfigured
+          ? UnitConverter.resolveDisplayUnit(
+              slotIndex: slotIndex,
+              tag: variable.tag,
+              rawUnit: variable.rawUnit,
+              well: payload.well,
+              job: payload.job,
+              preferences: unitPreferences,
+            )
+          : '';
+
+      final converted = isConfigured && variable.value != null
+          ? UnitConverter.convertValue(variable.value!, variable.rawUnit, displayUnit)
+          : null;
+      final sparkline = isConfigured ? (state.variableHistoryByTag[variable.tag] ?? const <double>[]) : const <double>[];
       final delta = sparkline.length >= 2
           ? ((sparkline.last - sparkline.first) / (sparkline.first == 0 ? 1 : sparkline.first)) * 100
           : 0.0;
-      final deltaPrefix = delta >= 0 ? 'â†—' : 'â†˜';
-      final status = _resolveTileStatus(state.connectionStatus, sparkline);
+      final deltaPrefix = delta >= 0 ? '↗' : '↘';
+      final status = isConfigured ? _resolveTileStatus(state.connectionStatus, sparkline) : TileVisualStatus.disabled;
+      final label = isConfigured && variable.label.trim().isNotEmpty ? variable.label : 'Slot ${variable.slot}';
 
       return VariableTileUiModel(
-        id: variable.tag,
-        label: variable.label,
-        valueText: converted == null ? '---' : UnitConverter.formatNumber(converted),
-        unitText: displayUnit,
+        id: isConfigured ? variable.tag : _inactiveTileId(variable.slot),
+        label: label,
+        valueText: isConfigured ? (converted == null ? '---' : UnitConverter.formatNumber(converted)) : '---',
+        unitText: isConfigured ? displayUnit : '',
         trendSeries: sparkline,
-        deltaText: '$deltaPrefix ${delta.toStringAsFixed(1)}%',
-        deltaDirection: delta >= 0 ? TrendDirection.up : TrendDirection.down,
+        deltaText: isConfigured ? '$deltaPrefix ${delta.toStringAsFixed(1)}%' : 'Inactiva',
+        deltaDirection: isConfigured
+            ? (delta >= 0 ? TrendDirection.up : TrendDirection.down)
+            : TrendDirection.flat,
         visualStatus: status,
-        accentColor: status == TileVisualStatus.warning ? LayoutTokens.accentOrange : LayoutTokens.accentGreen,
-        isSelected: _selectedVariableTag == variable.tag,
-        isTappable: true,
+        accentColor: isConfigured
+            ? (status == TileVisualStatus.warning ? LayoutTokens.accentOrange : LayoutTokens.accentGreen)
+            : LayoutTokens.textMuted,
+        isSelected: isConfigured && _selectedVariableTag == variable.tag,
+        isTappable: isConfigured,
       );
     }).toList(growable: false);
 
     final alerts = payload.alerts.map(_mapAlert).toList(growable: false);
 
     return DashboardUiModel(
-      appTitle: 'OperaciÃ³n en tiempo real',
+      appTitle: 'Operación en tiempo real',
       activeWell: payload.well,
-      wellStatus: state.connectionStatus == ConnectionStatus.connected ? 'En lÃ­nea' : 'Datos desactualizados',
+      wellStatus: state.connectionStatus == ConnectionStatus.connected ? 'En línea' : 'Datos desactualizados',
       tiles: tiles,
       predictorAlerts: alerts,
       selectedVariableId: _selectedVariableTag,
@@ -679,10 +760,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
   Future<void> _openLayoutControls() async {
     final dashboardState = ref.read(dashboardControllerProvider).asData?.value;
-    final currentTileCount = (dashboardState?.payload.variables.take(6).length ?? 0) + 1;
+    final currentTileCount = (dashboardState?.payload.variables.take(_dashboardVariableSlots).length ?? 0) + 1;
     final currentStatus = dashboardState == null
         ? 'Sin datos'
-        : (dashboardState.connectionStatus == ConnectionStatus.connected ? 'En lÃ­nea' : 'Desactualizado');
+        : (dashboardState.connectionStatus == ConnectionStatus.connected ? 'En línea' : 'Desactualizado');
     final currentStatusColor = dashboardState == null
         ? LayoutTokens.textMuted
         : (dashboardState.connectionStatus == ConnectionStatus.connected
@@ -715,7 +796,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Actual: ${_densityMode == _DensityMode.compact ? 'Compacto' : 'CÃ³modo'} Â· '
+                      'Actual: ${_densityMode == _DensityMode.compact ? 'Compacto' : 'Cómodo'} · '
                       '${_tileLayoutMode == _TileLayoutMode.grid ? 'Grilla' : 'Lista'}',
                       style: const TextStyle(color: LayoutTokens.textMuted),
                     ),
@@ -744,7 +825,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                         ),
                         ButtonSegment<_DensityMode>(
                           value: _DensityMode.comfortable,
-                          label: Text('CÃ³modo'),
+                          label: Text('Cómodo'),
                         ),
                       ],
                       selected: <_DensityMode>{_densityMode},
@@ -798,7 +879,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       child: Tooltip(
                         message: _isDefaultLayoutConfig
                             ? 'No hay cambios para restablecer'
-                            : 'Restablecer a configuraciÃ³n predeterminada',
+                            : 'Restablecer a configuración predeterminada',
                         child: TextButton.icon(
                           onPressed: _isDefaultLayoutConfig
                               ? null
@@ -814,7 +895,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       const Padding(
                         padding: EdgeInsets.only(top: 6),
                         child: Text(
-                          'Ya estÃ¡s usando la configuraciÃ³n por defecto.',
+                          'Ya estás usando la configuración por defecto.',
                           style: TextStyle(
                             color: LayoutTokens.textMuted,
                             fontSize: 12,
@@ -903,6 +984,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.atalayaColors;
     final variable = widget.variable;
     final tile = widget.tile;
     final accentColor = tile.accentColor;
@@ -915,13 +997,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
     final trendAsync = ref.watch(trendSeriesProvider(request));
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[LayoutTokens.bgPrimary, LayoutTokens.bgSecondary],
-        ),
-      ),
+      decoration: BoxDecoration(gradient: theme.pageGradient),
       child: SafeArea(
         bottom: true,
         child: Padding(
@@ -934,7 +1010,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                   width: 44,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: LayoutTokens.textMuted,
+                    color: theme.textMuted.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -950,8 +1026,8 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                           tile.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LayoutTokens.textPrimary,
+                          style: TextStyle(
+                            color: theme.textPrimary,
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                           ),
@@ -961,9 +1037,10 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                           variable.tag.isEmpty ? 'Variable' : 'Tag: ${variable.tag}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: LayoutTokens.textMuted,
+                          style: TextStyle(
+                            color: theme.textMuted,
                             fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -972,7 +1049,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                   IconButton(
                     onPressed: () => Navigator.of(context).maybePop(),
                     tooltip: 'Cerrar',
-                    icon: const Icon(Icons.close_rounded, color: LayoutTokens.textSecondary),
+                    icon: Icon(Icons.close_rounded, color: theme.textSecondary),
                   ),
                 ],
               ),
@@ -995,8 +1072,8 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                   unitText: trend.displayUnit,
                   deltaText: _deltaTextForPoints(trend.points),
                   accentColor: _deltaForPoints(trend.points) < 0
-                      ? LayoutTokens.accentOrange
-                      : LayoutTokens.accentGreen,
+                      ? theme.warning
+                      : theme.success,
                 ),
               ),
               const SizedBox(height: 12),
@@ -1008,12 +1085,12 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
               const SizedBox(height: 14),
               Row(
                 children: <Widget>[
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'GrÃ¡fica de variable',
+                      'Gráfica de variable',
                       style: TextStyle(
-                        color: LayoutTokens.textSecondary,
-                        fontWeight: FontWeight.w700,
+                        color: theme.textSecondary,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
@@ -1022,10 +1099,10 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                       trend.rangeText,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: LayoutTokens.textMuted,
+                      style: TextStyle(
+                        color: theme.textMuted,
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     orElse: () => const SizedBox.shrink(),
@@ -1038,12 +1115,21 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(8, 12, 12, 8),
                   decoration: BoxDecoration(
-                    color: LayoutTokens.surfaceCard.withValues(alpha: 0.76),
+                    color: theme.plot,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: LayoutTokens.dividerSubtle),
+                    border: Border.all(color: theme.border),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: theme.shadow,
+                        blurRadius: theme.isDark ? 0 : 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: trendAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () => Center(
+                      child: CircularProgressIndicator(color: theme.primary),
+                    ),
                     error: (error, _) => _VariableChartError(
                       message: error.toString(),
                       onRetry: () => ref.invalidate(trendSeriesProvider(request)),
@@ -1062,26 +1148,29 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
               const SizedBox(height: 10),
               trendAsync.when(
                 loading: () => Text(
-                  'Cargando ${_selectedRange.displayLabel} Â· solo lectura',
-                  style: const TextStyle(
-                    color: LayoutTokens.textMuted,
+                  'Cargando ${_selectedRange.displayLabel} · solo lectura',
+                  style: TextStyle(
+                    color: theme.textMuted,
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 error: (_, __) => Text(
                   'No fue posible cargar ${_selectedRange.displayLabel}.',
-                  style: const TextStyle(
-                    color: LayoutTokens.textMuted,
+                  style: TextStyle(
+                    color: theme.textMuted,
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 data: (trend) => Text(
                   trend.points.length >= 2
-                      ? '${trend.points.length} muestras Â· ${_selectedRange.displayLabel} Â· eje X en tiempo Â· solo lectura'
-                      : 'AÃºn no hay suficientes muestras para ${_selectedRange.displayLabel}.',
-                  style: const TextStyle(
-                    color: LayoutTokens.textMuted,
+                      ? '${trend.points.length} muestras · ${_selectedRange.displayLabel} · eje X en tiempo · solo lectura'
+                      : 'Aún no hay suficientes muestras para ${_selectedRange.displayLabel}.',
+                  style: TextStyle(
+                    color: theme.textMuted,
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1106,7 +1195,7 @@ class _VariableTrendSheetState extends ConsumerState<_VariableTrendSheet> {
 
   String _deltaTextForPoints(List<TrendPoint> points) {
     final delta = _deltaForPoints(points);
-    final arrow = delta >= 0 ? 'â†—' : 'â†˜';
+    final arrow = delta >= 0 ? '↗' : '↘';
     final sign = delta >= 0 ? '+' : '';
     return '$arrow $sign${delta.toStringAsFixed(1)}%';
   }
@@ -1125,6 +1214,7 @@ class _VariableRangeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.atalayaColors;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -1134,16 +1224,18 @@ class _VariableRangeSelector extends StatelessWidget {
           label: Text(range.displayLabel),
           selected: isSelected,
           showCheckmark: false,
-          selectedColor: LayoutTokens.accentBlue.withValues(alpha: 0.20),
-          backgroundColor: LayoutTokens.surfaceCard,
+          selectedColor: theme.primary.withValues(alpha: theme.isDark ? 0.24 : 0.18),
+          backgroundColor: theme.card,
           side: BorderSide(
             color: isSelected
-                ? LayoutTokens.accentBlue.withValues(alpha: 0.72)
-                : LayoutTokens.dividerSubtle,
+                ? theme.primary.withValues(alpha: 0.78)
+                : theme.border,
           ),
           labelStyle: TextStyle(
-            color: isSelected ? Colors.white : LayoutTokens.textSecondary,
-            fontWeight: FontWeight.w700,
+            color: isSelected
+                ? (theme.isDark ? Colors.white : theme.textPrimary)
+                : theme.textSecondary,
+            fontWeight: FontWeight.w800,
             fontSize: 12,
           ),
           onSelected: (_) => onSelected(range),
@@ -1168,13 +1260,21 @@ class _VariableValueSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.atalayaColors;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
+        gradient: theme.cardGradient,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
+        border: Border.all(color: theme.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: theme.shadow,
+            blurRadius: theme.isDark ? 0 : 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -1185,19 +1285,19 @@ class _VariableValueSummary extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
                 text: valueText,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: theme.textPrimary,
                   fontSize: 36,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   height: 1,
                 ),
                 children: <InlineSpan>[
                   TextSpan(
                     text: unitText.isEmpty ? '' : ' $unitText',
-                    style: const TextStyle(
-                      color: LayoutTokens.textSecondary,
+                    style: TextStyle(
+                      color: theme.textSecondary,
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -1233,6 +1333,7 @@ class _VariableTimeLineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.atalayaColors;
     final ordered = List<TrendPoint>.from(points)
       ..sort((left, right) => left.timestamp.compareTo(right.timestamp));
     final values = ordered.map((point) => point.value).toList(growable: false);
@@ -1250,8 +1351,8 @@ class _VariableTimeLineChart extends StatelessWidget {
         .toList(growable: false);
     final minX = spots.first.x;
     final maxX = spots.last.x;
-    final xSpan = math.max(1, maxX - minX);
-    final xInterval = math.max(60, xSpan / 4).toDouble();
+    final xSpan = math.max(1.0, maxX - minX).toDouble();
+    final xInterval = _xIntervalFor(range, xSpan);
 
     return LineChart(
       LineChartData(
@@ -1264,12 +1365,12 @@ class _VariableTimeLineChart extends StatelessWidget {
           show: true,
           drawVerticalLine: true,
           verticalInterval: xInterval,
-          getDrawingHorizontalLine: (_) => const FlLine(
-            color: Color(0x334A6D96),
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: theme.grid.withValues(alpha: theme.isDark ? 0.52 : 0.78),
             strokeWidth: 1,
           ),
-          getDrawingVerticalLine: (_) => const FlLine(
-            color: Color(0x1F4A6D96),
+          getDrawingVerticalLine: (_) => FlLine(
+            color: theme.grid.withValues(alpha: theme.isDark ? 0.36 : 0.62),
             strokeWidth: 1,
           ),
         ),
@@ -1277,30 +1378,41 @@ class _VariableTimeLineChart extends StatelessWidget {
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
-            axisNameWidget: const Padding(
-              padding: EdgeInsets.only(top: 6),
+            axisNameWidget: Padding(
+              padding: const EdgeInsets.only(top: 6),
               child: Text(
                 'Tiempo',
                 style: TextStyle(
-                  color: LayoutTokens.textMuted,
+                  color: theme.textMuted,
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 32,
+              reservedSize: range == TrendRange.h24 ? 40 : 32,
               interval: xInterval,
-              getTitlesWidget: (value, meta) => Text(
-                _formatAxisTime(value),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: LayoutTokens.textMuted,
-                  fontSize: 10,
-                  height: 1.1,
-                ),
-              ),
+              getTitlesWidget: (value, meta) {
+                final isEdge = (value - minX).abs() < 1 || (value - maxX).abs() < 1;
+                final shouldRender = isEdge || ((value - minX) % xInterval).abs() < 2;
+                if (!shouldRender) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    _formatAxisTime(value),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: theme.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      height: 1.1,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           leftTitles: AxisTitles(
@@ -1308,9 +1420,10 @@ class _VariableTimeLineChart extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 unit.isEmpty ? 'Valor' : unit,
-                style: const TextStyle(
-                  color: LayoutTokens.textMuted,
+                style: TextStyle(
+                  color: theme.textMuted,
                   fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -1319,9 +1432,10 @@ class _VariableTimeLineChart extends StatelessWidget {
               reservedSize: 46,
               getTitlesWidget: (value, meta) => Text(
                 UnitConverter.formatNumber(value),
-                style: const TextStyle(
-                  color: LayoutTokens.textMuted,
+                style: TextStyle(
+                  color: theme.textMuted,
                   fontSize: 10,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -1330,7 +1444,7 @@ class _VariableTimeLineChart extends StatelessWidget {
         lineTouchData: LineTouchData(
           enabled: true,
           touchTooltipData: LineTouchTooltipData(
-            getTooltipColor: (_) => const Color(0xEE0A162A),
+            getTooltipColor: (_) => theme.card.withValues(alpha: 0.96),
             fitInsideHorizontally: true,
             fitInsideVertically: true,
             getTooltipItems: (spots) {
@@ -1344,9 +1458,9 @@ class _VariableTimeLineChart extends StatelessWidget {
                 final formattedValue = unit.isEmpty ? value : '$value $unit';
                 return LineTooltipItem(
                   '$formattedValue\n$time',
-                  const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                  TextStyle(
+                    color: theme.textPrimary,
+                    fontWeight: FontWeight.w800,
                     fontSize: 11,
                   ),
                 );
@@ -1360,7 +1474,7 @@ class _VariableTimeLineChart extends StatelessWidget {
             isCurved: true,
             curveSmoothness: 0.24,
             color: color,
-            barWidth: 2.2,
+            barWidth: 2.4,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
@@ -1369,8 +1483,8 @@ class _VariableTimeLineChart extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: <Color>[
-                  color.withValues(alpha: 0.20),
-                  color.withValues(alpha: 0.04),
+                  color.withValues(alpha: theme.isDark ? 0.20 : 0.16),
+                  color.withValues(alpha: theme.isDark ? 0.05 : 0.04),
                   Colors.transparent,
                 ],
               ),
@@ -1379,6 +1493,23 @@ class _VariableTimeLineChart extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  double _xIntervalFor(TrendRange range, double xSpan) {
+    switch (range) {
+      case TrendRange.m30:
+        return 5 * 60;
+      case TrendRange.h2:
+        return 30 * 60;
+      case TrendRange.h6:
+        return 60 * 60;
+      case TrendRange.h8:
+        return 2 * 60 * 60;
+      case TrendRange.h12:
+        return 3 * 60 * 60;
+      case TrendRange.h24:
+        return 6 * 60 * 60;
+    }
   }
 
   String _formatAxisTime(double epochSeconds) {
@@ -1395,47 +1526,6 @@ class _VariableTimeLineChart extends StatelessWidget {
   }
 }
 
-class _NoVariableChartData extends StatelessWidget {
-  const _NoVariableChartData();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              Icons.show_chart_rounded,
-              color: LayoutTokens.textMuted,
-              size: 34,
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Sin datos suficientes para este rango.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: LayoutTokens.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(height: 6),
-            Text(
-              'Prueba otro rango de tiempo o espera nuevas muestras.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: LayoutTokens.textMuted,
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _VariableChartError extends StatelessWidget {
   const _VariableChartError({
     required this.message,
@@ -1447,20 +1537,21 @@ class _VariableChartError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.atalayaColors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(Icons.cloud_off_rounded, color: LayoutTokens.textMuted, size: 34),
+            Icon(Icons.cloud_off_rounded, color: theme.textMuted, size: 34),
             const SizedBox(height: 10),
-            const Text(
-              'No se pudo cargar el histÃ³rico.',
+            Text(
+              'No se pudo cargar el histórico.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: LayoutTokens.textSecondary,
-                fontWeight: FontWeight.w700,
+                color: theme.textSecondary,
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 6),
@@ -1469,8 +1560,8 @@ class _VariableChartError extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: LayoutTokens.textMuted,
+              style: TextStyle(
+                color: theme.textMuted,
                 fontSize: 11,
               ),
             ),
@@ -1479,6 +1570,44 @@ class _VariableChartError extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoVariableChartData extends StatelessWidget {
+  const _NoVariableChartData();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.atalayaColors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(Icons.show_chart_rounded, color: theme.textMuted, size: 34),
+            const SizedBox(height: 10),
+            Text(
+              'Sin datos suficientes para graficar.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.textSecondary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Selecciona un rango mayor o espera nuevas muestras.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.textMuted,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
@@ -1566,7 +1695,7 @@ class _SpecialPredictorTile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Hook Load Â· Torque Â· Pressure',
+              'Hook Load · Torque · Pressure',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -1646,7 +1775,7 @@ class _ControlsStatusSummary extends StatelessWidget {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                'Estado: $currentStatus Â· Tiles: $currentTileCount',
+                'Estado: $currentStatus · Tiles: $currentTileCount',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: LayoutTokens.textMuted),
@@ -1702,6 +1831,87 @@ class _SelectedVariableBanner extends StatelessWidget {
   }
 }
 
+
+class _InactiveVariableTile extends StatelessWidget {
+  const _InactiveVariableTile({
+    required this.slot,
+    required this.label,
+  });
+
+  final int slot;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF121C31) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0x334A607A) : const Color(0xFFD8E1EA);
+    final primaryText = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155);
+    final secondaryText = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cardColor.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(Icons.power_settings_new_rounded, size: 18, color: secondaryText),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label.trim().isEmpty ? 'Slot $slot' : label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: primaryText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              'Variable desactivada',
+              style: TextStyle(
+                color: secondaryText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: secondaryText.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: secondaryText.withValues(alpha: 0.26)),
+              ),
+              child: Text(
+                'Slot $slot / 12',
+                style: TextStyle(
+                  color: secondaryText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyKpiState extends StatelessWidget {
   const _EmptyKpiState();
 
@@ -1721,7 +1931,7 @@ class _EmptyKpiState extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'No hay variables disponibles para esta operaciÃ³n.',
+              'No hay variables disponibles para esta operación.',
               style: TextStyle(color: colors.textSecondary),
             ),
           ),
@@ -1733,6 +1943,7 @@ class _EmptyKpiState extends StatelessWidget {
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }
+
 
 
 
