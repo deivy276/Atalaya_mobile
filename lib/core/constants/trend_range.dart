@@ -12,19 +12,41 @@ enum TrendRange {
   final String displayLabel;
   final Duration duration;
 
+  String get wireValue => label;
+
   static TrendRange fromWireValue(String? value) {
-    switch ((value ?? '').trim().toLowerCase()) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    switch (normalized) {
       case '30m':
+      case '30min':
+      case '30 min':
+      case 'm30':
         return TrendRange.m30;
       case '2h':
+      case '2hr':
+      case '2 horas':
+      case 'h2':
         return TrendRange.h2;
       case '6h':
+      case '6hr':
+      case '6 horas':
+      case 'h6':
         return TrendRange.h6;
       case '8h':
+      case '8hr':
+      case '8 horas':
+      case 'h8':
         return TrendRange.h8;
       case '12h':
+      case '12hr':
+      case '12 horas':
+      case 'h12':
         return TrendRange.h12;
       case '24h':
+      case '24hr':
+      case '24 horas':
+      case '1d':
+      case 'h24':
         return TrendRange.h24;
       default:
         return TrendRange.m30;
