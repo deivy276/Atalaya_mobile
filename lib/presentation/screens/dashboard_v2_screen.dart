@@ -30,6 +30,11 @@ import '../widgets/v2/predictor_alerts_dock.dart';
 import '../widgets/v2/settings_panel.dart';
 import '../widgets/v2/well_overview_card.dart';
 
+// --- NUEVOS IMPORTS PARA COMENTARIOS ---
+import '../../data/services/comments_api_service.dart';
+import '../widgets/operational_comments_panel.dart';
+import '../providers/api_client_provider.dart';
+
 class DashboardV2Screen extends ConsumerStatefulWidget {
   const DashboardV2Screen({super.key, this.onLogout});
 
@@ -110,6 +115,8 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     DashboardUiModel uiModel,
     String job,
   ) {
+    final commentsApi = ref.watch(commentsApiServiceProvider);
+
     return CustomScrollView(
       slivers: <Widget>[
         _buildOverviewSliver(
@@ -121,15 +128,33 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         _buildTilesGrid(viewState, uiModel),
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
+            padding: const EdgeInsets.fromLTRB(
               16,
               12,
               16,
-              MediaQuery.of(context).padding.bottom + 12,
+              16, // Ajustado para dar espacio al siguiente bloque
             ),
             child: PredictorAlertsDock(
               alerts: viewState.payload.alerts,
               onOpenAlert: _openAlertDetail,
+            ),
+          ),
+        ),
+        // --- NUEVO SLIVER DE COMENTARIOS ---
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16, 
+              8, 
+              16, 
+              MediaQuery.of(context).padding.bottom + 24,
+            ),
+            child: OperationalCommentsPanel(
+              api: commentsApi,
+              well: uiModel.activeWell,
+              job: job,
+              limit: 20,
+              compact: true,
             ),
           ),
         ),
@@ -142,10 +167,13 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     DashboardUiModel uiModel,
     String job,
   ) {
+    final commentsApi = ref.watch(commentsApiServiceProvider);
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1480),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start, // Alineado arriba para permitir scroll lateral correcto
           children: <Widget>[
             Expanded(
               child: CustomScrollView(
@@ -163,12 +191,25 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             ),
             SizedBox(
               width: 360,
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(8, 14, 20, 20),
-                child: PredictorAlertsDock(
-                  alerts: viewState.payload.alerts,
-                  embedded: true,
-                  onOpenAlert: _openAlertDetail,
+                child: Column(
+                  children: [
+                    PredictorAlertsDock(
+                      alerts: viewState.payload.alerts,
+                      embedded: true,
+                      onOpenAlert: _openAlertDetail,
+                    ),
+                    const SizedBox(height: 16),
+                    // --- NUEVO PANEL DE COMENTARIOS ---
+                    OperationalCommentsPanel(
+                      api: commentsApi,
+                      well: uiModel.activeWell,
+                      job: job,
+                      limit: 20,
+                      compact: true,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1943,8 +1984,3 @@ class _EmptyKpiState extends StatelessWidget {
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }
-
-
-
-
-
