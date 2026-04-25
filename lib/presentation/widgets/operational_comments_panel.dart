@@ -11,6 +11,7 @@ class OperationalCommentsPanel extends StatefulWidget {
     this.job,
     this.limit = 20,
     this.compact = false,
+    this.onOpenAttachments,
   });
 
   final CommentsApiService api;
@@ -18,6 +19,14 @@ class OperationalCommentsPanel extends StatefulWidget {
   final String? job;
   final int limit;
   final bool compact;
+
+  /// Called when the user taps the attachment chip for a comment.
+  ///
+  /// The panel intentionally does not know how files are stored/opened.
+  /// Wire this from the parent screen to:
+  ///   GET /api/v1/attachments?entityType=comment&entityId=<comment.id>
+  ///   GET /api/v1/attachments/<attachment.id>/download
+  final ValueChanged<OperationalComment>? onOpenAttachments;
 
   @override
   State<OperationalCommentsPanel> createState() => _OperationalCommentsPanelState();
@@ -55,6 +64,73 @@ class _OperationalCommentsPanelState extends State<OperationalCommentsPanel> {
     setState(() {
       _future = _load();
     });
+  }
+
+  Future<void> _openAllCommentsSheet(
+    BuildContext context,
+    List<OperationalComment> comments,
+  ) async {
+    final theme = Theme.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.90,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    width: 52,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: theme.dividerColor.withOpacity(0.65),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Todos los comentarios (${comments.length})',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cerrar',
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: comments.length,
+                    itemBuilder: (_, index) => _CommentTile(
+                      comment: comments[index],
+                      onOpenAttachments: widget.onOpenAttachments,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -114,14 +190,18 @@ class _OperationalCommentsPanelState extends State<OperationalCommentsPanel> {
                 final visible = widget.compact ? comments.take(3).toList(growable: false) : comments;
                 return Column(
                   children: <Widget>[
-                    for (final comment in visible) _CommentTile(comment: comment),
+                    for (final comment in visible)
+                      _CommentTile(
+                        comment: comment,
+                        onOpenAttachments: widget.onOpenAttachments,
+                      ),
                     if (widget.compact && comments.length > visible.length)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
-                          onPressed: null,
+                          onPressed: () => _openAllCommentsSheet(context, comments),
                           icon: const Icon(Icons.more_horiz),
-                          label: Text('${comments.length - visible.length} más'),
+                          label: Text('Ver ${comments.length - visible.length} más'),
                         ),
                       ),
                   ],
@@ -136,9 +216,13 @@ class _OperationalCommentsPanelState extends State<OperationalCommentsPanel> {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment});
+  const _CommentTile({
+    required this.comment,
+    this.onOpenAttachments,
+  });
 
   final OperationalComment comment;
+  final ValueChanged<OperationalComment>? onOpenAttachments;
 
   @override
   Widget build(BuildContext context) {
@@ -180,10 +264,23 @@ class _CommentTile extends StatelessWidget {
               children: <Widget>[
                 for (final tag in comment.tags.take(4)) Chip(label: Text(tag), visualDensity: VisualDensity.compact),
                 if (comment.attachmentsCount > 0)
-                  Chip(
+                  ActionChip(
                     avatar: const Icon(Icons.attach_file, size: 16),
                     label: Text('${comment.attachmentsCount}'),
                     visualDensity: VisualDensity.compact,
+                    tooltip: 'Ver adjuntos',
+                    onPressed: () {
+                      final handler = onOpenAttachments;
+                      if (handler != null) {
+                        handler(comment);
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Adjuntos disponibles. Falta conectar el handler de descarga.'),
+                        ),
+                      );
+                    },
                   ),
               ],
             ),
