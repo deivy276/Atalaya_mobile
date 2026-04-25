@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:dio/dio.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/trend_range.dart';
@@ -12,6 +15,7 @@ import '../../core/theme/layout_tokens.dart';
 import '../../core/theme/atalaya_theme.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/alert.dart';
+import '../../data/models/operational_comment.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/models/trend_point.dart';
 import '../../data/models/well_variable.dart';
@@ -137,6 +141,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             child: PredictorAlertsDock(
               alerts: viewState.payload.alerts,
               onOpenAlert: _openAlertDetail,
+              onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
             ),
           ),
         ),
@@ -155,6 +160,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
               job: job,
               limit: 20,
               compact: true,
+              onOpenAttachments: _openCommentAttachments,
             ),
           ),
         ),
@@ -199,6 +205,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       alerts: viewState.payload.alerts,
                       embedded: true,
                       onOpenAlert: _openAlertDetail,
+                      onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
                     ),
                     const SizedBox(height: 16),
                     // --- NUEVO PANEL DE COMENTARIOS ---
@@ -208,6 +215,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       job: job,
                       limit: 20,
                       compact: true,
+                      onOpenAttachments: _openCommentAttachments,
                     ),
                   ],
                 ),
@@ -709,6 +717,144 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       vibrate: settings.vibrate || event.rule.sound,
     );
   }
+
+  Future<void> _openCommentAttachments(OperationalComment comment) async {
+    final dio = ref.read(dioProvider);
+
+    try {
+      final response = await dio.get<dynamic>(
+        '/api/v1/attachments',
+        queryParameters: <String, String>{
+          'entityType': 'comment',
+          'entityId': comment.id,
+          '_': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+        options: Options(
+          headers: const <String, String>{
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        ),
+      );
+
+      final data = response.data;
+      final rawItems = data is Map<String, dynamic> ? data['items'] : null;
+      final items = (rawItems as List? ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(growable: false);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No hay adjuntos para este comentario.')),
+        );
+        return;
+      }
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: context.atalayaColors.card,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetContext) {
+          return SafeArea(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(16),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, index) {
+                final item = items[index];
+                final id = '${item['id'] ?? ''}';
+                final fileName = '${item['fileName'] ?? 'attachment'}';
+                final contentType = '${item['contentType'] ?? ''}';
+                final sizeBytes = item['sizeBytes'];
+
+                return ListTile(
+                  leading: const Icon(Icons.attach_file),
+                  title: Text(
+                    fileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    <String>[
+                      if (contentType.isNotEmpty) contentType,
+                      if (sizeBytes != null) '$sizeBytes bytes',
+                    ].join(' · '),
+                  ),
+                  trailing: const Icon(Icons.download_rounded),
+                  onTap: id.isEmpty
+                      ? null
+                      : () async {
+                          Navigator.of(sheetContext).pop();
+                          await _downloadCommentAttachment(id, fileName);
+                        },
+                );
+              },
+            ),
+          );
+        },
+      );
+    } catch (err) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron cargar los adjuntos: $err')),
+      );
+    }
+  }
+
+  Future<void> _downloadCommentAttachment(String attachmentId, String fileName) async {
+    final dio = ref.read(dioProvider);
+    final safeName = _safeDownloadFileName(fileName);
+    final targetDir = await Directory.systemTemp.createTemp('atalaya_attachment_');
+    final targetPath = '${targetDir.path}${Platform.pathSeparator}$safeName';
+
+    try {
+      await dio.download(
+        '/api/v1/attachments/$attachmentId/download',
+        targetPath,
+        options: Options(
+          headers: const <String, String>{
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        ),
+      );
+
+      final result = await OpenFilex.open(targetPath);
+      if (!mounted) {
+        return;
+      }
+      if (result.type != ResultType.done) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Adjunto descargado en: $targetPath')),
+        );
+      }
+    } catch (err) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo descargar el adjunto: $err')),
+      );
+    }
+  }
+
+  static String _safeDownloadFileName(String fileName) {
+    final cleaned = fileName.trim().replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    return cleaned.isEmpty ? 'attachment' : cleaned;
+  }
+
   Future<void> _openAlertDetail(AtalayaAlert alert) async {
     await showModalBottomSheet<void>(
       context: context,
