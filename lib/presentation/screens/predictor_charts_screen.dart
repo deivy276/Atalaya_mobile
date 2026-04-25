@@ -341,7 +341,7 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
       source: source,
       note: note,
       series: series,
-      fieldPoints: fieldPoints.take(180).toList(growable: false),
+      fieldPoints: fieldPoints.toList(growable: false),
     );
   }
 
@@ -730,7 +730,7 @@ class _ChartMetaLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sourceLabel = data.isFallback ? 'Fallback local' : 'Datos reales';
+    final sourceLabel = data.isFallback ? 'Fallback local' : 'Snapshot Predictor';
     final sourceColor = data.isFallback ? LayoutTokens.accentOrange : LayoutTokens.accentGreen;
 
     return Text.rich(
