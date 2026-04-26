@@ -40,6 +40,7 @@ class CommentsApiService {
   Future<List<OperationalComment>> fetchComments({
     String well = 'IXACHI-45',
     String? job,
+    String operationMode = 'drilling',
     int limit = 50,
   }) async {
     final token = await tokenProvider();
@@ -51,7 +52,9 @@ class CommentsApiService {
       _uri('/api/v1/comments', <String, String?>{
         'well': well,
         'job': job,
+        'mode': operationMode,
         'limit': limit.toString(),
+        '_': DateTime.now().millisecondsSinceEpoch.toString(),
       }),
       headers: <String, String>{
         'Authorization': 'Bearer $token',

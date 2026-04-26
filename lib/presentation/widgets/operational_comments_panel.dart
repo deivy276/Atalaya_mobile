@@ -9,6 +9,7 @@ class OperationalCommentsPanel extends StatefulWidget {
     required this.api,
     this.well = 'IXACHI-45',
     this.job,
+    this.operationMode = 'drilling',
     this.limit = 20,
     this.compact = false,
     this.onOpenAttachments,
@@ -17,6 +18,7 @@ class OperationalCommentsPanel extends StatefulWidget {
   final CommentsApiService api;
   final String well;
   final String? job;
+  final String operationMode;
   final int limit;
   final bool compact;
 
@@ -46,6 +48,7 @@ class _OperationalCommentsPanelState extends State<OperationalCommentsPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.well != widget.well ||
         oldWidget.job != widget.job ||
+        oldWidget.operationMode != widget.operationMode ||
         oldWidget.limit != widget.limit ||
         oldWidget.api != widget.api) {
       _future = _load();
@@ -56,6 +59,7 @@ class _OperationalCommentsPanelState extends State<OperationalCommentsPanel> {
     return widget.api.fetchComments(
       well: widget.well,
       job: widget.job,
+      operationMode: widget.operationMode,
       limit: widget.limit,
     );
   }

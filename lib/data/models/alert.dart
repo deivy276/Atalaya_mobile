@@ -59,6 +59,9 @@ class AtalayaAlert {
     required this.createdAt,
     required this.attachmentsCount,
     required this.attachments,
+    this.title,
+    this.metricTag,
+    this.operationMode,
   });
 
   final String id;
@@ -67,6 +70,9 @@ class AtalayaAlert {
   final DateTime createdAt;
   final int attachmentsCount;
   final List<Attachment> attachments;
+  final String? title;
+  final String? metricTag;
+  final String? operationMode;
 
   factory AtalayaAlert.fromJson(Map<String, dynamic> json) {
     final attachmentsRaw = json['attachments'];
@@ -79,12 +85,15 @@ class AtalayaAlert {
 
     return AtalayaAlert(
       id: (json['id'] ?? '').toString(),
-      description: (json['description'] ?? '').toString(),
+      description: (json['description'] ?? json['message'] ?? json['title'] ?? '').toString(),
       severity: AlertSeverity.fromRaw(json['severity']?.toString()),
       createdAt: _asDateTime(json['createdAt'] ?? json['created_at']) ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       attachmentsCount: _asInt(json['attachmentsCount'] ?? json['attachments_count']) ?? attachments.length,
       attachments: attachments,
+      title: _asString(json['title']),
+      metricTag: _asString(json['metricTag'] ?? json['metric_tag']),
+      operationMode: _asString(json['operationMode'] ?? json['operation_mode'] ?? json['mode']),
     );
   }
 
@@ -95,6 +104,9 @@ class AtalayaAlert {
     DateTime? createdAt,
     int? attachmentsCount,
     List<Attachment>? attachments,
+    String? title,
+    String? metricTag,
+    String? operationMode,
   }) {
     return AtalayaAlert(
       id: id ?? this.id,
@@ -103,7 +115,16 @@ class AtalayaAlert {
       createdAt: createdAt ?? this.createdAt,
       attachmentsCount: attachmentsCount ?? this.attachmentsCount,
       attachments: attachments ?? this.attachments,
+      title: title ?? this.title,
+      metricTag: metricTag ?? this.metricTag,
+      operationMode: operationMode ?? this.operationMode,
     );
+  }
+
+  static String? _asString(Object? raw) {
+    final text = raw?.toString().trim();
+    if (text == null || text.isEmpty) return null;
+    return text;
   }
 
   static int? _asInt(Object? raw) {

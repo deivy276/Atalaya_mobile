@@ -16,6 +16,7 @@ import '../../core/theme/atalaya_theme.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/alert.dart';
 import '../../data/models/operational_comment.dart';
+import '../../data/models/predictor_mode_config.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/models/trend_point.dart';
 import '../../data/models/well_variable.dart';
@@ -158,6 +159,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
               api: commentsApi,
               well: uiModel.activeWell,
               job: job,
+              operationMode: viewState.operationMode,
               limit: 20,
               compact: true,
               onOpenAttachments: _openCommentAttachments,
@@ -213,6 +215,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       api: commentsApi,
                       well: uiModel.activeWell,
                       job: job,
+                      operationMode: viewState.operationMode,
                       limit: 20,
                       compact: true,
                       onOpenAttachments: _openCommentAttachments,
@@ -243,6 +246,12 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             well: uiModel.activeWell,
             job: job,
             isActive: viewState.connectionStatus == ConnectionStatus.connected,
+          ),
+          const SizedBox(height: 12),
+          _OperationModeSelector(
+            currentMode: viewState.operationMode,
+            modes: viewState.predictorModes,
+            onChanged: (mode) => ref.read(dashboardControllerProvider.notifier).setOperationMode(mode),
           ),
           if (selectedTile != null) ...<Widget>[
             const SizedBox(height: 12),
@@ -1124,22 +1133,119 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
 
   Future<void> _openSpecialPredictorScreen() async {
+    final dashboardState = ref.read(dashboardControllerProvider).asData?.value;
+    final operationMode = dashboardState?.operationMode ?? 'drilling';
+    final specialCharts = dashboardState?.predictorConfig?.specialCharts ?? const <PredictorChartConfig>[];
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext sheetContext) {
-        return const FractionallySizedBox(
+        return FractionallySizedBox(
           heightFactor: 0.94,
           child: ClipRRect(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             child: PredictorChartsPanel(
               embedded: true,
+              operationMode: operationMode,
+              specialCharts: specialCharts,
             ),
           ),
         );
       },
+    );
+  }
+}
+
+
+class _OperationModeSelector extends StatelessWidget {
+  const _OperationModeSelector({
+    required this.currentMode,
+    required this.modes,
+    required this.onChanged,
+  });
+
+  final String currentMode;
+  final List<PredictorModeSummary> modes;
+  final ValueChanged<String> onChanged;
+
+  static const List<PredictorModeSummary> _fallbackModes = <PredictorModeSummary>[
+    PredictorModeSummary(
+      mode: 'drilling',
+      label: 'Perforación',
+      labelEn: 'Drilling',
+      labelEs: 'Perforación',
+      variablesCount: 12,
+      specialChartsCount: 4,
+    ),
+    PredictorModeSummary(
+      mode: 'completion',
+      label: 'Terminación',
+      labelEn: 'Completion',
+      labelEs: 'Terminación',
+      variablesCount: 12,
+      specialChartsCount: 3,
+    ),
+    PredictorModeSummary(
+      mode: 'production',
+      label: 'Producción',
+      labelEn: 'Production',
+      labelEs: 'Producción',
+      variablesCount: 12,
+      specialChartsCount: 1,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveModes = modes.isEmpty ? _fallbackModes : modes;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: LayoutTokens.surfaceCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: LayoutTokens.dividerSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Modo operativo',
+            style: TextStyle(
+              color: LayoutTokens.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: effectiveModes.map((mode) {
+              final selected = mode.mode == currentMode;
+              return ChoiceChip(
+                label: Text(mode.label),
+                selected: selected,
+                showCheckmark: false,
+                selectedColor: const Color(0x443FA7FF),
+                backgroundColor: LayoutTokens.bgSecondary,
+                side: BorderSide(
+                  color: selected ? const Color(0x883FA7FF) : LayoutTokens.dividerSubtle,
+                ),
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : LayoutTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+                onSelected: (_) => onChanged(mode.mode),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
     );
   }
 }

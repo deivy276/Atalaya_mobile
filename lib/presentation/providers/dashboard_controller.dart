@@ -1,9 +1,12 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/datasources/atalaya_api_client.dart';
 import '../../data/models/alert.dart';
 import '../../data/models/dashboard_payload.dart';
+import '../../data/models/predictor_mode_config.dart';
+import '../../data/models/well_variable.dart';
 import '../../data/models/app_settings.dart';
 import 'alert_settings_controller.dart';
 import 'app_settings_controller.dart';
@@ -26,6 +29,9 @@ class DashboardViewState {
     required this.errorMessage,
     required this.variableHistoryByTag,
     required this.latestIncomingAlert,
+    this.operationMode = 'drilling',
+    this.predictorModes = const <PredictorModeSummary>[],
+    this.predictorConfig,
   });
 
   final DashboardPayload payload;
@@ -35,6 +41,9 @@ class DashboardViewState {
   final String? errorMessage;
   final Map<String, List<double>> variableHistoryByTag;
   final AtalayaAlert? latestIncomingAlert;
+  final String operationMode;
+  final List<PredictorModeSummary> predictorModes;
+  final PredictorModeConfig? predictorConfig;
 
   DashboardViewState copyWith({
     DashboardPayload? payload,
@@ -46,6 +55,10 @@ class DashboardViewState {
     Map<String, List<double>>? variableHistoryByTag,
     AtalayaAlert? latestIncomingAlert,
     bool clearLatestIncomingAlert = false,
+    String? operationMode,
+    List<PredictorModeSummary>? predictorModes,
+    PredictorModeConfig? predictorConfig,
+    bool clearPredictorConfig = false,
   }) {
     return DashboardViewState(
       payload: payload ?? this.payload,
@@ -55,6 +68,9 @@ class DashboardViewState {
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
       variableHistoryByTag: variableHistoryByTag ?? this.variableHistoryByTag,
       latestIncomingAlert: clearLatestIncomingAlert ? null : (latestIncomingAlert ?? this.latestIncomingAlert),
+      operationMode: operationMode ?? this.operationMode,
+      predictorModes: predictorModes ?? this.predictorModes,
+      predictorConfig: clearPredictorConfig ? null : (predictorConfig ?? this.predictorConfig),
     );
   }
 
@@ -65,6 +81,9 @@ class DashboardViewState {
     String? errorMessage,
     Map<String, List<double>> variableHistoryByTag = const <String, List<double>>{},
     AtalayaAlert? latestIncomingAlert,
+    String? operationMode,
+    List<PredictorModeSummary> predictorModes = const <PredictorModeSummary>[],
+    PredictorModeConfig? predictorConfig,
   }) {
     return DashboardViewState(
       payload: payload,
@@ -74,6 +93,9 @@ class DashboardViewState {
       errorMessage: errorMessage,
       variableHistoryByTag: variableHistoryByTag,
       latestIncomingAlert: latestIncomingAlert,
+      operationMode: operationMode ?? payload.operationMode,
+      predictorModes: predictorModes,
+      predictorConfig: predictorConfig,
     );
   }
 }
@@ -142,6 +164,28 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     await forceRefresh();
   }
 
+
+  Future<void> setOperationMode(String mode) async {
+    final normalized = _normalizeOperationMode(mode);
+    final previous = state.value;
+    if (previous != null && previous.operationMode == normalized) {
+      return;
+    }
+
+    if (previous != null) {
+      state = AsyncData(
+        previous.copyWith(
+          operationMode: normalized,
+          clearPredictorConfig: true,
+          clearErrorMessage: true,
+        ),
+      );
+    }
+
+    await _fetch(initialLoad: false, silent: false, requestedOperationMode: normalized);
+    _scheduleNextPoll(immediate: false);
+  }
+
   void _scheduleNextPoll({bool immediate = false}) {
     _pollTimer?.cancel();
     final configuredInterval = ref.read(appSettingsControllerProvider).pollingIntervalSeconds;
@@ -167,6 +211,7 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
   Future<DashboardViewState> _fetch({
     required bool initialLoad,
     required bool silent,
+    String? requestedOperationMode,
   }) async {
     if (_refreshInFlight) {
       return state.value ??
@@ -184,9 +229,26 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     }
 
     try {
-      final repository = ref.read(atalayaRepositoryProvider);
-      final rawPayload = await repository.getDashboard();
-      final payload = _applyOperationalAlarms(rawPayload);
+      final operationMode = _normalizeOperationMode(
+        requestedOperationMode ?? previous?.operationMode ?? 'drilling',
+      );
+      final apiClient = ref.read(atalayaApiClientProvider);
+      final predictorModes = await _loadPredictorModes(apiClient, previous?.predictorModes);
+      final predictorConfig = await _loadPredictorConfig(
+        apiClient,
+        operationMode,
+        previous?.predictorConfig,
+      );
+
+      final rawPayload = atalayaMockModeEnabled()
+          ? await ref.read(atalayaRepositoryProvider).getDashboard()
+          : await apiClient.fetchDashboard(operationMode: operationMode);
+
+      final configuredPayload = _applyPredictorConfig(
+        rawPayload.copyWith(operationMode: operationMode),
+        predictorConfig,
+      );
+      final payload = _applyOperationalAlarms(configuredPayload);
       _retryCount = 0;
       _consecutiveFailures = 0;
       final newAlertIds = _collectNewAlertIds(payload.alerts);
@@ -196,6 +258,9 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
         newAlertIds: newAlertIds,
         variableHistoryByTag: _mergeVariableHistory(previous?.variableHistoryByTag, payload),
         latestIncomingAlert: _resolveLatestIncomingAlert(payload.alerts, newAlertIds),
+        operationMode: operationMode,
+        predictorModes: predictorModes,
+        predictorConfig: predictorConfig,
       );
       state = AsyncData(next);
       return next;
@@ -222,6 +287,129 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     } finally {
       _refreshInFlight = false;
     }
+  }
+
+
+  Future<List<PredictorModeSummary>> _loadPredictorModes(
+    AtalayaApiClient apiClient,
+    List<PredictorModeSummary>? previous,
+  ) async {
+    if (atalayaMockModeEnabled()) {
+      return previous ?? const <PredictorModeSummary>[];
+    }
+
+    try {
+      final modes = await apiClient.fetchPredictorModes(lang: 'es');
+      return modes.isEmpty ? (previous ?? const <PredictorModeSummary>[]) : modes;
+    } catch (_) {
+      return previous ?? const <PredictorModeSummary>[];
+    }
+  }
+
+  Future<PredictorModeConfig?> _loadPredictorConfig(
+    AtalayaApiClient apiClient,
+    String operationMode,
+    PredictorModeConfig? previous,
+  ) async {
+    if (atalayaMockModeEnabled()) {
+      return previous;
+    }
+
+    try {
+      return await apiClient.fetchPredictorConfig(
+        operationMode: operationMode,
+        lang: 'es',
+      );
+    } catch (_) {
+      if (previous?.operationMode == operationMode) {
+        return previous;
+      }
+      return null;
+    }
+  }
+
+  DashboardPayload _applyPredictorConfig(
+    DashboardPayload payload,
+    PredictorModeConfig? config,
+  ) {
+    if (config == null || config.variables.isEmpty) {
+      return payload;
+    }
+
+    final variablesByTag = <String, WellVariable>{};
+    for (final variable in payload.variables) {
+      final tag = _normalizeTag(variable.tag);
+      if (tag.isNotEmpty) {
+        variablesByTag[tag] = variable;
+      }
+    }
+
+    final configuredVariables = <WellVariable>[];
+    for (final variableConfig in config.variables) {
+      final candidates = <String>[
+        variableConfig.mnemonic,
+        ...variableConfig.fallbackMnemonics,
+        ...variableConfig.mnemonics,
+      ].map(_normalizeTag).where((tag) => tag.isNotEmpty);
+
+      WellVariable? sample;
+      for (final candidate in candidates) {
+        sample = variablesByTag[candidate];
+        if (sample != null) {
+          break;
+        }
+      }
+
+      configuredVariables.add(
+        WellVariable(
+          slot: variableConfig.slot,
+          label: variableConfig.label,
+          tag: variableConfig.mnemonic,
+          rawUnit: variableConfig.displayUnit.isNotEmpty
+              ? variableConfig.displayUnit
+              : variableConfig.rawUnit,
+          value: sample?.value,
+          rawTextValue: sample?.rawTextValue,
+          sampleAt: sample?.sampleAt,
+          configured: variableConfig.enabled && variableConfig.configured,
+        ),
+      );
+    }
+
+    return payload.copyWith(
+      operationMode: config.operationMode,
+      variables: configuredVariables,
+    );
+  }
+
+  String _normalizeOperationMode(String raw) {
+    final text = raw.trim().toLowerCase().replaceAll('_', '-');
+    switch (text) {
+      case 'completion':
+      case 'complete':
+      case 'terminacion':
+      case 'terminación':
+        return 'completion';
+      case 'production':
+      case 'prod':
+      case 'produccion':
+      case 'producción':
+        return 'production';
+      case 'drilling':
+      case 'drill':
+      case 'perforacion':
+      case 'perforación':
+      default:
+        return 'drilling';
+    }
+  }
+
+  String _normalizeTag(String raw) {
+    var text = raw.trim().toUpperCase();
+    while (text.endsWith('.')) {
+      text = text.substring(0, text.length - 1);
+    }
+    return text;
   }
 
   DashboardPayload _applyOperationalAlarms(DashboardPayload payload) {
@@ -270,6 +458,7 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     return DashboardPayload(
       well: payload.well,
       job: payload.job,
+      operationMode: payload.operationMode,
       latestSampleAt: payload.latestSampleAt,
       staleThresholdSeconds: payload.staleThresholdSeconds,
       variables: payload.variables,

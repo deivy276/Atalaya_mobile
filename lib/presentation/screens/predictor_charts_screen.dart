@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/layout_tokens.dart';
+import '../../data/models/predictor_mode_config.dart';
 import '../providers/api_client_provider.dart';
 
 const String _predictorScreenTitle = 'Special Predictor Screen';
@@ -23,13 +24,28 @@ const List<Color> _seriesPalette = <Color>[
 enum PredictorChartType {
   hookLoad('Hook Load', 'ton', 'hook_load'),
   surfaceTorque('Surface Torque', 'ft-lbf', 'surface_torque'),
-  pumpPressure('Pump Pressure', 'psi', 'pump_pressure');
+  pumpPressure('Pump Pressure', 'psi', 'pump_pressure'),
+  woba('WOBA', 'ton', 'woba'),
+  completionHookLoad('Hook Load', 'ton', 'completion_hook_load'),
+  completionWoba('WOBA', 'ton', 'completion_woba'),
+  completionDownholePressureTemperature('Presión / Temperatura Fondo', '', 'completion_downhole_pressure_temperature'),
+  productionOverview('Production Overview', '', 'production_overview');
 
   const PredictorChartType(this.label, this.unit, this.apiValue);
 
   final String label;
   final String unit;
   final String apiValue;
+
+  static PredictorChartType? fromApiValue(String raw) {
+    final normalized = raw.trim().toLowerCase();
+    for (final type in PredictorChartType.values) {
+      if (type.apiValue == normalized) {
+        return type;
+      }
+    }
+    return null;
+  }
 }
 
 class PredictorChartsScreen extends StatelessWidget {
@@ -38,11 +54,15 @@ class PredictorChartsScreen extends StatelessWidget {
     this.initialType = PredictorChartType.hookLoad,
     this.sourceLabel,
     this.sourceTag,
+    this.operationMode = 'drilling',
+    this.specialCharts = const <PredictorChartConfig>[],
   });
 
   final PredictorChartType initialType;
   final String? sourceLabel;
   final String? sourceTag;
+  final String operationMode;
+  final List<PredictorChartConfig> specialCharts;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +74,8 @@ class PredictorChartsScreen extends StatelessWidget {
         initialType: initialType,
         sourceLabel: sourceLabel,
         sourceTag: sourceTag,
+        operationMode: operationMode,
+        specialCharts: specialCharts,
       ),
     );
   }
@@ -66,12 +88,16 @@ class PredictorChartsPanel extends ConsumerStatefulWidget {
     this.initialType = PredictorChartType.hookLoad,
     this.sourceLabel,
     this.sourceTag,
+    this.operationMode = 'drilling',
+    this.specialCharts = const <PredictorChartConfig>[],
   });
 
   final bool embedded;
   final PredictorChartType initialType;
   final String? sourceLabel;
   final String? sourceTag;
+  final String operationMode;
+  final List<PredictorChartConfig> specialCharts;
 
   @override
   ConsumerState<PredictorChartsPanel> createState() => _PredictorChartsPanelState();
@@ -84,15 +110,17 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.initialType;
+    _selected = _resolveInitialType();
     _chartFuture = _loadChart(_selected);
   }
 
   @override
   void didUpdateWidget(covariant PredictorChartsPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialType != widget.initialType) {
-      _selected = widget.initialType;
+    if (oldWidget.initialType != widget.initialType ||
+        oldWidget.operationMode != widget.operationMode ||
+        oldWidget.specialCharts != widget.specialCharts) {
+      _selected = _resolveInitialType();
       _chartFuture = _loadChart(_selected);
     }
   }
@@ -158,9 +186,9 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
                   ],
                 ),
               ],
-              const Text(
-                'Active Drag & Tension · Solo lectura',
-                style: TextStyle(color: LayoutTokens.textMuted),
+              Text(
+                '${_operationModeLabel(widget.operationMode)} · Solo lectura',
+                style: const TextStyle(color: LayoutTokens.textMuted),
               ),
               if (widget.sourceLabel != null || widget.sourceTag != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -190,7 +218,7 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: PredictorChartType.values.map((type) {
+                children: _availableTypes.map((type) {
                   final isSelected = _selected == type;
                   return ChoiceChip(
                     label: Text(type.label),
@@ -230,6 +258,56 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
     );
   }
 
+
+  List<PredictorChartType> get _availableTypes {
+    final configured = widget.specialCharts
+        .map((chart) => PredictorChartType.fromApiValue(chart.type))
+        .whereType<PredictorChartType>()
+        .toList(growable: false);
+    if (configured.isNotEmpty) {
+      return configured;
+    }
+
+    switch (widget.operationMode.trim().toLowerCase()) {
+      case 'completion':
+        return const <PredictorChartType>[
+          PredictorChartType.completionHookLoad,
+          PredictorChartType.completionWoba,
+          PredictorChartType.completionDownholePressureTemperature,
+        ];
+      case 'production':
+        return const <PredictorChartType>[PredictorChartType.productionOverview];
+      case 'drilling':
+      default:
+        return const <PredictorChartType>[
+          PredictorChartType.hookLoad,
+          PredictorChartType.surfaceTorque,
+          PredictorChartType.pumpPressure,
+          PredictorChartType.woba,
+        ];
+    }
+  }
+
+  PredictorChartType _resolveInitialType() {
+    final available = _availableTypes;
+    if (available.contains(widget.initialType)) {
+      return widget.initialType;
+    }
+    return available.isNotEmpty ? available.first : PredictorChartType.hookLoad;
+  }
+
+  String _operationModeLabel(String mode) {
+    switch (mode.trim().toLowerCase()) {
+      case 'completion':
+        return 'Completion / Terminación';
+      case 'production':
+        return 'Production / Producción';
+      case 'drilling':
+      default:
+        return 'Drilling / Perforación';
+    }
+  }
+
   void _selectType(PredictorChartType type) {
     if (_selected == type) return;
     setState(() {
@@ -247,7 +325,10 @@ class _PredictorChartsPanelState extends ConsumerState<PredictorChartsPanel> {
       final dio = ref.read(dioProvider);
       final response = await dio.get<dynamic>(
         '/api/v1/predictor',
-        queryParameters: <String, dynamic>{'type': type.apiValue},
+        queryParameters: <String, dynamic>{
+          'type': type.apiValue,
+          'mode': widget.operationMode,
+        },
       );
 
       final payload = _asMap(response.data);
@@ -767,12 +848,22 @@ _XAxisConfig _xAxisConfig(PredictorChartType type, double observedMax) {
     PredictorChartType.hookLoad => 50.0,
     PredictorChartType.surfaceTorque => 50.0,
     PredictorChartType.pumpPressure => 500.0,
+    PredictorChartType.woba => 10.0,
+    PredictorChartType.completionHookLoad => 50.0,
+    PredictorChartType.completionWoba => 10.0,
+    PredictorChartType.completionDownholePressureTemperature => 500.0,
+    PredictorChartType.productionOverview => 500.0,
   };
 
   final minimumMax = switch (type) {
     PredictorChartType.hookLoad => 300.0,
     PredictorChartType.surfaceTorque => 400.0,
     PredictorChartType.pumpPressure => 4500.0,
+    PredictorChartType.woba => 80.0,
+    PredictorChartType.completionHookLoad => 300.0,
+    PredictorChartType.completionWoba => 80.0,
+    PredictorChartType.completionDownholePressureTemperature => 5000.0,
+    PredictorChartType.productionOverview => 5000.0,
   };
 
   final safeMax = observedMax.isFinite ? observedMax : minimumMax;
