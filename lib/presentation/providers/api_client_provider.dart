@@ -8,6 +8,7 @@ import '../../data/repositories/atalaya_repository_impl.dart';
 import '../../data/repositories/mock_atalaya_repository.dart';
 import '../../domain/repositories/atalaya_repository.dart';
 
+import '../../data/services/comments_api_service.dart';
 bool atalayaMockModeEnabled() {
   const raw = String.fromEnvironment('ATALAYA_USE_MOCK', defaultValue: 'false');
   final normalized = raw.trim().toLowerCase();
@@ -181,4 +182,15 @@ final atalayaRepositoryProvider = Provider<AtalayaRepository>((ref) {
   }
 
   return AtalayaRepositoryImpl(ref.watch(atalayaApiClientProvider));
+});
+
+
+final commentsApiServiceProvider = Provider<CommentsApiService>((ref) {
+  final dio = ref.watch(dioProvider);
+  final storage = ref.watch(sessionSecureStorageProvider);
+
+  return CommentsApiService(
+    baseUrl: dio.options.baseUrl,
+    tokenProvider: () => storage.readToken(),
+  );
 });
