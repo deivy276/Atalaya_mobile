@@ -36,7 +36,6 @@ import '../widgets/v2/settings_panel.dart';
 import '../widgets/v2/well_overview_card.dart';
 
 // --- NUEVOS IMPORTS PARA COMENTARIOS ---
-import '../../data/services/comments_api_service.dart';
 import '../widgets/operational_comments_panel.dart';
 import '../providers/api_client_provider.dart';
 
@@ -2526,34 +2525,6 @@ class _InactiveVariableTile extends StatelessWidget {
   }
 }
 
-class _EmptyKpiState extends StatelessWidget {
-  const _EmptyKpiState();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.atalayaColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      decoration: BoxDecoration(
-        color: colors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.insights_outlined, color: colors.textSecondary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'No hay variables disponibles para esta operación.',
-              style: TextStyle(color: colors.textSecondary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }

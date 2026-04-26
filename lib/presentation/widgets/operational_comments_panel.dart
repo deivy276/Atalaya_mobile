@@ -26,8 +26,8 @@ class OperationalCommentsPanel extends StatefulWidget {
   ///
   /// The panel intentionally does not know how files are stored/opened.
   /// Wire this from the parent screen to:
-  ///   GET /api/v1/attachments?entityType=comment&entityId=<comment.id>
-  ///   GET /api/v1/attachments/<attachment.id>/download
+  ///   `GET /api/v1/attachments?entityType=comment&entityId={comment.id}`
+  ///   `GET /api/v1/attachments/{attachment.id}/download`
   final ValueChanged<OperationalComment>? onOpenAttachments;
 
   @override
@@ -96,7 +96,7 @@ class _OperationalCommentsPanelState extends State<OperationalCommentsPanel> {
                     width: 52,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: theme.dividerColor.withOpacity(0.65),
+                      color: theme.dividerColor.withValues(alpha: 0.65),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -244,7 +244,7 @@ class _CommentTile extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.45)),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.45)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,7 +257,7 @@ class _CommentTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               subtitleParts.join(' · '),
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.textTheme.bodySmall?.color?.withOpacity(0.72)),
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.72)),
             ),
           ],
           if (comment.tags.isNotEmpty || comment.attachmentsCount > 0) ...<Widget>[
@@ -314,7 +314,7 @@ class _MessageBox extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.45),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
