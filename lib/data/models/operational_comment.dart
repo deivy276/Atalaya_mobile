@@ -12,6 +12,7 @@ class OperationalComment {
     this.createdAt,
     this.updatedAt,
     this.attachmentsCount = 0,
+    this.operationMode,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class OperationalComment {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final int attachmentsCount;
+  final String? operationMode;
 
   factory OperationalComment.fromJson(Map<String, dynamic> json) {
     return OperationalComment(
@@ -41,6 +43,7 @@ class OperationalComment {
       createdAt: _asDate(json['createdAt'] ?? json['created_at']),
       updatedAt: _asDate(json['updatedAt'] ?? json['updated_at']),
       attachmentsCount: _asInt(json['attachmentsCount'] ?? json['attachments_count']),
+      operationMode: _asString(json['operationMode'] ?? json['operation_mode'] ?? json['mode']),
     );
   }
 

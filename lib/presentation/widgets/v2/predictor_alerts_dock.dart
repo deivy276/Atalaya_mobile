@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/theme/layout_tokens.dart';
+import '../../../core/theme/atalaya_theme.dart';
 import '../../../data/models/alert.dart';
 
 class PredictorAlertsDock extends StatefulWidget {
@@ -10,11 +10,16 @@ class PredictorAlertsDock extends StatefulWidget {
     required this.alerts,
     this.embedded = false,
     this.onOpenAlert,
+    this.onRefresh,
   });
 
   final List<AtalayaAlert> alerts;
   final bool embedded;
   final ValueChanged<AtalayaAlert>? onOpenAlert;
+
+  /// Optional external refresh hook. Wire this from the dashboard to
+  /// dashboardControllerProvider.notifier.forceRefresh() or provider invalidation.
+  final VoidCallback? onRefresh;
 
   @override
   State<PredictorAlertsDock> createState() => _PredictorAlertsDockState();
@@ -41,6 +46,7 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     final alerts = widget.alerts;
     final visibleAlerts = _expanded ? alerts : alerts.take(1).toList(growable: false);
 
@@ -48,11 +54,18 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
       duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: widget.embedded ? const Color(0xEE0A162A) : const Color(0xEE081427),
+        color: colors.card.withValues(alpha: colors.isDark ? 0.96 : 0.98),
         borderRadius: widget.embedded
             ? BorderRadius.circular(22)
             : const BorderRadius.vertical(top: Radius.circular(22)),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
+        border: Border.all(color: colors.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: widget.embedded
           ? Column(
@@ -62,6 +75,7 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
                   expanded: _expanded,
                   onToggleExpanded: alerts.isEmpty ? null : _toggleExpanded,
                   onOpenAll: alerts.isEmpty ? null : () => _openAllAlertsSheet(context),
+                  onRefresh: widget.onRefresh,
                 ),
                 if (alerts.isEmpty)
                   const Expanded(child: _EmptyAlertsState())
@@ -82,6 +96,7 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
                   expanded: _expanded,
                   onToggleExpanded: alerts.isEmpty ? null : _toggleExpanded,
                   onOpenAll: alerts.isEmpty ? null : () => _openAllAlertsSheet(context),
+                  onRefresh: widget.onRefresh,
                 ),
                 if (alerts.isEmpty)
                   const _EmptyAlertsState()
@@ -116,11 +131,13 @@ class _PredictorAlertsDockState extends State<PredictorAlertsDock> {
   }
 
   Future<void> _openAllAlertsSheet(BuildContext context) async {
+    final colors = context.atalayaColors;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFF081427),
+      backgroundColor: colors.card,
+      barrierColor: Colors.black.withValues(alpha: colors.isDark ? 0.42 : 0.22),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -146,42 +163,55 @@ class _AlertsHeader extends StatelessWidget {
     required this.expanded,
     required this.onToggleExpanded,
     required this.onOpenAll,
+    this.onRefresh,
   });
 
   final int count;
   final bool expanded;
   final VoidCallback? onToggleExpanded;
   final VoidCallback? onOpenAll;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return Row(
       children: <Widget>[
-        const Expanded(
+        Expanded(
           child: Text(
             'Predictor KPIs & Alerts',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: LayoutTokens.textPrimary,
+              color: colors.textPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 15,
             ),
           ),
         ),
+        if (onRefresh != null)
+          IconButton(
+            tooltip: 'Actualizar alertas',
+            onPressed: onRefresh,
+            icon: Icon(
+              Icons.refresh_rounded,
+              color: colors.textSecondary,
+              size: 20,
+            ),
+          ),
         Semantics(
           label: '$count alertas activas',
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: LayoutTokens.surfaceCard,
+              color: colors.cardAlt,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: LayoutTokens.dividerSubtle),
+              border: Border.all(color: colors.border),
             ),
             child: Text(
               '$count',
-              style: const TextStyle(
-                color: LayoutTokens.textSecondary,
+              style: TextStyle(
+                color: colors.textSecondary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -194,16 +224,16 @@ class _AlertsHeader extends StatelessWidget {
             onPressed: onToggleExpanded,
             icon: Icon(
               expanded ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-              color: LayoutTokens.textSecondary,
+              color: colors.textSecondary,
             ),
           ),
         if (count > 1)
           IconButton(
             tooltip: 'Ver todas las alertas',
             onPressed: onOpenAll,
-            icon: const Icon(
+            icon: Icon(
               Icons.open_in_full_rounded,
-              color: LayoutTokens.textSecondary,
+              color: colors.textSecondary,
               size: 20,
             ),
           ),
@@ -223,6 +253,7 @@ class _OpenAllAlertsButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
@@ -230,8 +261,8 @@ class _OpenAllAlertsButton extends StatelessWidget {
         icon: const Icon(Icons.list_alt_rounded, size: 18),
         label: Text('Ver las $count alertas'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: LayoutTokens.accentBlue,
-          side: const BorderSide(color: LayoutTokens.accentBlue),
+          foregroundColor: colors.primary,
+          side: BorderSide(color: colors.primary),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
@@ -277,14 +308,15 @@ class _AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _severityColor(alert.severity);
+    final colors = context.atalayaColors;
+    final color = _severityColor(alert.severity, colors);
 
     return Container(
       padding: EdgeInsets.all(compact ? 10 : 12),
       decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
+        color: colors.cardAlt.withValues(alpha: colors.isDark ? 0.72 : 0.92),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.72)),
+        border: Border.all(color: color.withValues(alpha: 0.70)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -298,7 +330,7 @@ class _AlertCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.14),
+                        color: color.withValues(alpha: colors.isDark ? 0.14 : 0.10),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(color: color.withValues(alpha: 0.75)),
                       ),
@@ -317,8 +349,8 @@ class _AlertCard extends StatelessWidget {
                         'Predictor · ${DateFormat('dd/MM HH:mm').format(alert.createdAt.toLocal())}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: LayoutTokens.textMuted,
+                        style: TextStyle(
+                          color: colors.textMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -331,7 +363,7 @@ class _AlertCard extends StatelessWidget {
                   maxLines: compact ? 2 : 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: LayoutTokens.textPrimary,
+                    color: colors.textPrimary,
                     fontWeight: FontWeight.w700,
                     height: 1.22,
                     fontSize: compact ? 13 : 14,
@@ -341,8 +373,8 @@ class _AlertCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     '${alert.attachmentsCount} adjunto${alert.attachmentsCount == 1 ? '' : 's'}',
-                    style: const TextStyle(
-                      color: LayoutTokens.textMuted,
+                    style: TextStyle(
+                      color: colors.textMuted,
                       fontSize: 12,
                     ),
                   ),
@@ -360,14 +392,14 @@ class _AlertCard extends StatelessWidget {
     );
   }
 
-  Color _severityColor(AlertSeverity severity) {
+  Color _severityColor(AlertSeverity severity, AtalayaThemeColors colors) {
     switch (severity) {
       case AlertSeverity.critical:
-        return LayoutTokens.accentRed;
+        return colors.danger;
       case AlertSeverity.attention:
-        return LayoutTokens.accentOrange;
+        return colors.warning;
       case AlertSeverity.ok:
-        return LayoutTokens.accentBlue;
+        return colors.primary;
     }
   }
 }
@@ -383,64 +415,68 @@ class _AllAlertsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Center(
-            child: Container(
-              width: 52,
-              height: 5,
-              decoration: BoxDecoration(
-                color: LayoutTokens.textMuted.withValues(alpha: 0.62),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  'Alertas del Predictor (${alerts.length})',
-                  style: const TextStyle(
-                    color: LayoutTokens.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
+    final colors = context.atalayaColors;
+    return Container(
+      decoration: BoxDecoration(gradient: colors.pageGradient),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Center(
+              child: Container(
+                width: 52,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: colors.textMuted.withValues(alpha: 0.62),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              IconButton(
-                tooltip: 'Cerrar',
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: LayoutTokens.textSecondary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Listado completo de alarmas y notas generadas. Desplázate para revisar todas.',
-            style: TextStyle(color: LayoutTokens.textMuted),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: alerts.isEmpty
-                ? const _EmptyAlertsState()
-                : ListView.separated(
-                    itemCount: alerts.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final alert = alerts[index];
-                      return _AlertCard(
-                        alert: alert,
-                        compact: false,
-                        onOpen: () => onOpenAlert(alert),
-                      );
-                    },
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Alertas del Predictor (${alerts.length})',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-          ),
-        ],
+                ),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Icon(Icons.close_rounded, color: colors.textSecondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Listado completo de alarmas y notas generadas. Desplázate para revisar todas.',
+              style: TextStyle(color: colors.textMuted),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: alerts.isEmpty
+                  ? const _EmptyAlertsState()
+                  : ListView.separated(
+                      itemCount: alerts.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final alert = alerts[index];
+                        return _AlertCard(
+                          alert: alert,
+                          compact: false,
+                          onOpen: () => onOpenAlert(alert),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -451,12 +487,13 @@ class _EmptyAlertsState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(top: 18, bottom: 12),
+    final colors = context.atalayaColors;
+    return Padding(
+      padding: const EdgeInsets.only(top: 18, bottom: 12),
       child: Center(
         child: Text(
           'No hay alertas activas',
-          style: TextStyle(color: LayoutTokens.textMuted),
+          style: TextStyle(color: colors.textMuted),
         ),
       ),
     );

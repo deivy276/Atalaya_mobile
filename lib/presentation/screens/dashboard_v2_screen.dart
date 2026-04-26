@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:dio/dio.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/trend_range.dart';
@@ -12,6 +15,8 @@ import '../../core/theme/layout_tokens.dart';
 import '../../core/theme/atalaya_theme.dart';
 import '../../core/utils/unit_converter.dart';
 import '../../data/models/alert.dart';
+import '../../data/models/operational_comment.dart';
+import '../../data/models/predictor_mode_config.dart';
 import '../../data/models/app_settings.dart';
 import '../../data/models/trend_point.dart';
 import '../../data/models/well_variable.dart';
@@ -31,7 +36,6 @@ import '../widgets/v2/settings_panel.dart';
 import '../widgets/v2/well_overview_card.dart';
 
 // --- NUEVOS IMPORTS PARA COMENTARIOS ---
-import '../../data/services/comments_api_service.dart';
 import '../widgets/operational_comments_panel.dart';
 import '../providers/api_client_provider.dart';
 
@@ -123,7 +127,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           viewState: viewState,
           uiModel: uiModel,
-          job: job,
         ),
         _buildTilesGrid(viewState, uiModel),
         SliverToBoxAdapter(
@@ -137,6 +140,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             child: PredictorAlertsDock(
               alerts: viewState.payload.alerts,
               onOpenAlert: _openAlertDetail,
+              onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
             ),
           ),
         ),
@@ -153,8 +157,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
               api: commentsApi,
               well: uiModel.activeWell,
               job: job,
+              operationMode: viewState.operationMode,
               limit: 20,
               compact: true,
+              onOpenAttachments: _openCommentAttachments,
             ),
           ),
         ),
@@ -182,7 +188,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     padding: const EdgeInsets.fromLTRB(20, 14, 12, 0),
                     viewState: viewState,
                     uiModel: uiModel,
-                    job: job,
                   ),
                   _buildTilesGrid(viewState, uiModel),
                   const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -199,6 +204,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       alerts: viewState.payload.alerts,
                       embedded: true,
                       onOpenAlert: _openAlertDetail,
+                      onRefresh: () => ref.read(dashboardControllerProvider.notifier).forceRefresh(),
                     ),
                     const SizedBox(height: 16),
                     // --- NUEVO PANEL DE COMENTARIOS ---
@@ -206,8 +212,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                       api: commentsApi,
                       well: uiModel.activeWell,
                       job: job,
+                      operationMode: viewState.operationMode,
                       limit: 20,
                       compact: true,
+                      onOpenAttachments: _openCommentAttachments,
                     ),
                   ],
                 ),
@@ -223,7 +231,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     required EdgeInsets padding,
     required DashboardViewState viewState,
     required DashboardUiModel uiModel,
-    required String job,
   }) {
     final selectedTile = _findSelectedTile(uiModel);
 
@@ -233,9 +240,19 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         delegate: SliverChildListDelegate.fixed(<Widget>[
           WellOverviewCard(
             well: uiModel.activeWell,
-            job: job,
+            job: _operationModeLabel(viewState),
             isActive: viewState.connectionStatus == ConnectionStatus.connected,
           ),
+          const SizedBox(height: 12),
+          _OperationModeSelector(
+            currentMode: viewState.operationMode,
+            modes: viewState.predictorModes,
+            onChanged: (mode) => ref.read(dashboardControllerProvider.notifier).setOperationMode(mode),
+          ),
+          if (_operationModeDataHint(viewState) != null) ...<Widget>[
+            const SizedBox(height: 10),
+            _OperationModeDataHint(hint: _operationModeDataHint(viewState)!),
+          ],
           if (selectedTile != null) ...<Widget>[
             const SizedBox(height: 12),
             _SelectedVariableBanner(tile: selectedTile),
@@ -244,6 +261,106 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         ]),
       ),
     );
+  }
+
+
+  String _operationModeLabel(DashboardViewState viewState) {
+    final configLabel = viewState.predictorConfig?.label.trim();
+    if (configLabel != null && configLabel.isNotEmpty) {
+      return configLabel;
+    }
+
+    for (final mode in viewState.predictorModes) {
+      if (mode.mode == viewState.operationMode && mode.label.trim().isNotEmpty) {
+        return mode.label.trim();
+      }
+    }
+
+    switch (viewState.operationMode.trim().toLowerCase()) {
+      case 'completion':
+        return 'Terminación';
+      case 'production':
+        return 'Producción';
+      case 'drilling':
+      default:
+        return 'Perforación';
+    }
+  }
+
+  _ModeDataHint? _operationModeDataHint(DashboardViewState viewState) {
+    if (viewState.operationMode == 'drilling') {
+      return null;
+    }
+
+    final configuredCount = _enabledVariableCount(viewState);
+    if (configuredCount <= 0) {
+      return null;
+    }
+
+    final dataCount = _variablesWithDataCount(viewState);
+    if (dataCount >= configuredCount) {
+      return null;
+    }
+
+    final modeLabel = _operationModeLabel(viewState);
+    final missingPreview = _missingMnemonicPreview(viewState);
+    final title = dataCount == 0
+        ? 'Sin datos para $modeLabel todavía'
+        : 'Datos parciales de $modeLabel';
+    final detail = dataCount == 0
+        ? (missingPreview.isEmpty
+            ? 'El modo está activo. Esperando muestras de telemetría para esta configuración.'
+            : 'El modo está activo. Esperando muestras: $missingPreview.')
+        : (missingPreview.isEmpty
+            ? '$dataCount de $configuredCount variables tienen muestra reciente.'
+            : '$dataCount de $configuredCount variables tienen muestra reciente. Faltan: $missingPreview.');
+
+    return _ModeDataHint(
+      title: title,
+      detail: detail,
+      isEmpty: dataCount == 0,
+    );
+  }
+
+  int _enabledVariableCount(DashboardViewState viewState) {
+    final config = viewState.predictorConfig;
+    if (config != null && config.variables.isNotEmpty) {
+      final enabled = config.variables.where((variable) => variable.enabled && variable.configured).length;
+      if (enabled > 0) {
+        return enabled;
+      }
+      return config.variables.length;
+    }
+    return viewState.payload.variables.length;
+  }
+
+  int _variablesWithDataCount(DashboardViewState viewState) {
+    return viewState.payload.variables.where(_variableHasData).length;
+  }
+
+  bool _variableHasData(WellVariable variable) {
+    if (variable.value != null) {
+      return true;
+    }
+    final raw = variable.rawTextValue?.trim();
+    return raw != null && raw.isNotEmpty && raw != '---';
+  }
+
+  String _missingMnemonicPreview(DashboardViewState viewState) {
+    final missing = <String>[];
+    for (final variable in viewState.payload.variables) {
+      if (_variableHasData(variable)) {
+        continue;
+      }
+      final tag = variable.tag.trim();
+      if (tag.isNotEmpty && !missing.contains(tag)) {
+        missing.add(tag);
+      }
+      if (missing.length >= 4) {
+        break;
+      }
+    }
+    return missing.join(', ');
   }
 
   Widget _buildTilesGrid(
@@ -709,6 +826,144 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
       vibrate: settings.vibrate || event.rule.sound,
     );
   }
+
+  Future<void> _openCommentAttachments(OperationalComment comment) async {
+    final dio = ref.read(dioProvider);
+
+    try {
+      final response = await dio.get<dynamic>(
+        '/api/v1/attachments',
+        queryParameters: <String, String>{
+          'entityType': 'comment',
+          'entityId': comment.id,
+          '_': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+        options: Options(
+          headers: const <String, String>{
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        ),
+      );
+
+      final data = response.data;
+      final rawItems = data is Map<String, dynamic> ? data['items'] : null;
+      final items = (rawItems as List? ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(growable: false);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No hay adjuntos para este comentario.')),
+        );
+        return;
+      }
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: context.atalayaColors.card,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetContext) {
+          return SafeArea(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(16),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, index) {
+                final item = items[index];
+                final id = '${item['id'] ?? ''}';
+                final fileName = '${item['fileName'] ?? 'attachment'}';
+                final contentType = '${item['contentType'] ?? ''}';
+                final sizeBytes = item['sizeBytes'];
+
+                return ListTile(
+                  leading: const Icon(Icons.attach_file),
+                  title: Text(
+                    fileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    <String>[
+                      if (contentType.isNotEmpty) contentType,
+                      if (sizeBytes != null) '$sizeBytes bytes',
+                    ].join(' · '),
+                  ),
+                  trailing: const Icon(Icons.download_rounded),
+                  onTap: id.isEmpty
+                      ? null
+                      : () async {
+                          Navigator.of(sheetContext).pop();
+                          await _downloadCommentAttachment(id, fileName);
+                        },
+                );
+              },
+            ),
+          );
+        },
+      );
+    } catch (err) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron cargar los adjuntos: $err')),
+      );
+    }
+  }
+
+  Future<void> _downloadCommentAttachment(String attachmentId, String fileName) async {
+    final dio = ref.read(dioProvider);
+    final safeName = _safeDownloadFileName(fileName);
+    final targetDir = await Directory.systemTemp.createTemp('atalaya_attachment_');
+    final targetPath = '${targetDir.path}${Platform.pathSeparator}$safeName';
+
+    try {
+      await dio.download(
+        '/api/v1/attachments/$attachmentId/download',
+        targetPath,
+        options: Options(
+          headers: const <String, String>{
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        ),
+      );
+
+      final result = await OpenFilex.open(targetPath);
+      if (!mounted) {
+        return;
+      }
+      if (result.type != ResultType.done) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Adjunto descargado en: $targetPath')),
+        );
+      }
+    } catch (err) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo descargar el adjunto: $err')),
+      );
+    }
+  }
+
+  static String _safeDownloadFileName(String fileName) {
+    final cleaned = fileName.trim().replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    return cleaned.isEmpty ? 'attachment' : cleaned;
+  }
+
   Future<void> _openAlertDetail(AtalayaAlert alert) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -978,22 +1233,339 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
 
   Future<void> _openSpecialPredictorScreen() async {
+    final dashboardState = ref.read(dashboardControllerProvider).asData?.value;
+    final operationMode = dashboardState?.operationMode ?? 'drilling';
+    final specialCharts = dashboardState?.predictorConfig?.specialCharts ?? const <PredictorChartConfig>[];
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext sheetContext) {
-        return const FractionallySizedBox(
+        return FractionallySizedBox(
           heightFactor: 0.94,
           child: ClipRRect(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             child: PredictorChartsPanel(
               embedded: true,
+              operationMode: operationMode,
+              specialCharts: specialCharts,
             ),
           ),
         );
       },
+    );
+  }
+}
+
+
+
+class _ModeDataHint {
+  const _ModeDataHint({
+    required this.title,
+    required this.detail,
+    required this.isEmpty,
+  });
+
+  final String title;
+  final String detail;
+  final bool isEmpty;
+}
+
+class _OperationModeDataHint extends StatelessWidget {
+  const _OperationModeDataHint({required this.hint});
+
+  final _ModeDataHint hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
+    final accent = hint.isEmpty ? LayoutTokens.accentOrange : LayoutTokens.accentBlue;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          accent.withValues(alpha: colors.isDark ? 0.14 : 0.08),
+          colors.card,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: colors.isDark ? 0.38 : 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: colors.isDark ? 0.18 : 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              hint.isEmpty ? Icons.sensors_off_rounded : Icons.info_outline_rounded,
+              size: 16,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  hint.title,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  hint.detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OperationModeSelector extends StatelessWidget {
+  const _OperationModeSelector({
+    required this.currentMode,
+    required this.modes,
+    required this.onChanged,
+  });
+
+  final String currentMode;
+  final List<PredictorModeSummary> modes;
+  final ValueChanged<String> onChanged;
+
+  static const Duration _animationDuration = Duration(milliseconds: 240);
+  static const Curve _animationCurve = Curves.easeOutCubic;
+
+  static const List<PredictorModeSummary> _fallbackModes = <PredictorModeSummary>[
+    PredictorModeSummary(
+      mode: 'drilling',
+      label: 'Perforación',
+      labelEn: 'Drilling',
+      labelEs: 'Perforación',
+      variablesCount: 12,
+      specialChartsCount: 4,
+    ),
+    PredictorModeSummary(
+      mode: 'completion',
+      label: 'Terminación',
+      labelEn: 'Completion',
+      labelEs: 'Terminación',
+      variablesCount: 12,
+      specialChartsCount: 3,
+    ),
+    PredictorModeSummary(
+      mode: 'production',
+      label: 'Producción',
+      labelEn: 'Production',
+      labelEs: 'Producción',
+      variablesCount: 12,
+      specialChartsCount: 1,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
+    final materialTheme = Theme.of(context);
+    final effectiveModes = modes.isEmpty ? _fallbackModes : modes;
+    final selectedIndexRaw = effectiveModes.indexWhere((mode) => mode.mode == currentMode);
+    final selectedIndex = selectedIndexRaw < 0 ? 0 : selectedIndexRaw;
+
+    final activeFill = colors.success;
+    final activeTextColor = ThemeData.estimateBrightnessForColor(activeFill) == Brightness.dark
+        ? materialTheme.colorScheme.onPrimary
+        : colors.textPrimary;
+    final inactiveTextColor = colors.textSecondary;
+    final controlBackground = Color.alphaBlend(
+      colors.textPrimary.withValues(alpha: colors.isDark ? 0.065 : 0.045),
+      colors.card,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: colors.isDark ? 0.34 : 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            'Modo operativo',
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.1,
+            ),
+          ),
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 360;
+              final segmentFontSize = compact ? 11.5 : 12.5;
+              final segmentHeight = compact ? 46.0 : 50.0;
+              final segmentCount = effectiveModes.length;
+              final selectedAlignment = _alignmentForIndex(selectedIndex, segmentCount);
+
+              return Container(
+                height: segmentHeight,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: controlBackground,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: colors.border.withValues(alpha: colors.isDark ? 0.85 : 0.55)),
+                ),
+                child: Stack(
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: AnimatedAlign(
+                        alignment: selectedAlignment,
+                        duration: _animationDuration,
+                        curve: _animationCurve,
+                        child: FractionallySizedBox(
+                          widthFactor: 1 / segmentCount,
+                          heightFactor: 1,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            decoration: BoxDecoration(
+                              color: activeFill,
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: <BoxShadow>[
+                                BoxShadow(
+                                  color: activeFill.withValues(alpha: colors.isDark ? 0.38 : 0.24),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: effectiveModes.map((mode) {
+                        final selected = mode.mode == currentMode;
+                        return Expanded(
+                          child: _OperationModeSegment(
+                            label: mode.label,
+                            selected: selected,
+                            fontSize: segmentFontSize,
+                            activeTextColor: activeTextColor,
+                            inactiveTextColor: inactiveTextColor,
+                            onTap: selected ? null : () => onChanged(mode.mode),
+                          ),
+                        );
+                      }).toList(growable: false),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Alignment _alignmentForIndex(int index, int total) {
+    if (total <= 1) {
+      return Alignment.center;
+    }
+    final x = (index / (total - 1)) * 2 - 1;
+    return Alignment(math.max(-1.0, math.min(1.0, x)), 0);
+  }
+}
+
+class _OperationModeSegment extends StatelessWidget {
+  const _OperationModeSegment({
+    required this.label,
+    required this.selected,
+    required this.fontSize,
+    required this.activeTextColor,
+    required this.inactiveTextColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final double fontSize;
+  final Color activeTextColor;
+  final Color inactiveTextColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: AnimatedDefaultTextStyle(
+                duration: _OperationModeSelector._animationDuration,
+                curve: _OperationModeSelector._animationCurve,
+                style: TextStyle(
+                  color: selected ? activeTextColor : inactiveTextColor,
+                  fontSize: fontSize,
+                  height: 1,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
+                  letterSpacing: selected ? 0.05 : 0,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1953,34 +2525,6 @@ class _InactiveVariableTile extends StatelessWidget {
   }
 }
 
-class _EmptyKpiState extends StatelessWidget {
-  const _EmptyKpiState();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.atalayaColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      decoration: BoxDecoration(
-        color: colors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.insights_outlined, color: colors.textSecondary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'No hay variables disponibles para esta operación.',
-              style: TextStyle(color: colors.textSecondary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 enum _DensityMode { compact, comfortable }
 
 enum _TileLayoutMode { grid, list }

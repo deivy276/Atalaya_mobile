@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../../core/constants/trend_range.dart';
 import '../models/attachment.dart';
 import '../models/dashboard_payload.dart';
+import '../models/predictor_mode_config.dart';
 import '../models/trend_point.dart';
 
 class AtalayaApiClient {
@@ -12,10 +13,60 @@ class AtalayaApiClient {
 
   final Dio _dio;
 
-  Future<DashboardPayload> fetchDashboard() async {
-    final response = await _dio.get<dynamic>('/api/v1/dashboard');
+  Future<DashboardPayload> fetchDashboard({
+    String operationMode = 'drilling',
+    String? well,
+    String? job,
+  }) async {
+    final response = await _dio.get<dynamic>(
+      '/api/v1/dashboard',
+      queryParameters: <String, dynamic>{
+        'mode': operationMode,
+        if (well != null && well.trim().isNotEmpty) 'well': well.trim(),
+        if (job != null && job.trim().isNotEmpty) 'job': job.trim(),
+        '_': DateTime.now().millisecondsSinceEpoch,
+      },
+    );
     final data = _asMap(response.data);
     return DashboardPayload.fromJson(_unwrapPayload(data));
+  }
+
+  Future<List<PredictorModeSummary>> fetchPredictorModes({String lang = 'es'}) async {
+    final response = await _dio.get<dynamic>(
+      '/api/v1/predictor/modes',
+      queryParameters: <String, dynamic>{
+        'lang': lang,
+        '_': DateTime.now().millisecondsSinceEpoch,
+      },
+    );
+
+    final data = _unwrapPayload(_asMap(response.data));
+    final itemsRaw = data['items'] ?? data['modes'];
+    if (itemsRaw is! List) {
+      return const <PredictorModeSummary>[];
+    }
+
+    return itemsRaw
+        .whereType<Map>()
+        .map((item) => PredictorModeSummary.fromJson(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
+  }
+
+  Future<PredictorModeConfig> fetchPredictorConfig({
+    String operationMode = 'drilling',
+    String lang = 'es',
+  }) async {
+    final response = await _dio.get<dynamic>(
+      '/api/v1/predictor/config',
+      queryParameters: <String, dynamic>{
+        'mode': operationMode,
+        'lang': lang,
+        '_': DateTime.now().millisecondsSinceEpoch,
+      },
+    );
+
+    final data = _unwrapPayload(_asMap(response.data));
+    return PredictorModeConfig.fromJson(data);
   }
 
   Future<List<TrendPoint>> fetchTrend({
