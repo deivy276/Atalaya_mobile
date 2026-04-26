@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/atalaya_api_client.dart';
 import '../../data/models/alert.dart';
@@ -133,6 +134,7 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
   static const Duration _maxPollInterval = Duration(seconds: 15);
   static const int _staleGraceSeconds = 8;
   static const int _maxHistoryPointsPerVariable = 24;
+  static const String _operationModePrefKey = 'atalaya_mobile_operation_mode';
 
   Timer? _pollTimer;
   bool _refreshInFlight = false;
@@ -149,7 +151,12 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
       }
     });
 
-    final initial = await _fetch(initialLoad: true, silent: true);
+    final persistedOperationMode = await _loadPersistedOperationMode();
+    final initial = await _fetch(
+      initialLoad: true,
+      silent: true,
+      requestedOperationMode: persistedOperationMode,
+    );
     _scheduleNextPoll();
     ref.onDispose(() => _pollTimer?.cancel());
     return initial;
@@ -169,8 +176,11 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
     final normalized = _normalizeOperationMode(mode);
     final previous = state.value;
     if (previous != null && previous.operationMode == normalized) {
+      await _persistOperationMode(normalized);
       return;
     }
+
+    await _persistOperationMode(normalized);
 
     if (previous != null) {
       state = AsyncData(
@@ -277,10 +287,12 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
         state = AsyncData(fallback);
         return fallback;
       }
+      final fallbackMode = _normalizeOperationMode(requestedOperationMode ?? 'drilling');
       final fallback = DashboardViewState.fromPayload(
-        DashboardPayload.empty(),
+        DashboardPayload.empty().copyWith(operationMode: fallbackMode),
         connectionStatus: ConnectionStatus.offline,
         errorMessage: friendlyError,
+        operationMode: fallbackMode,
       );
       state = AsyncData(fallback);
       return fallback;
@@ -380,6 +392,26 @@ class DashboardController extends AsyncNotifier<DashboardViewState> {
       operationMode: config.operationMode,
       variables: configuredVariables,
     );
+  }
+
+
+  Future<String> _loadPersistedOperationMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_operationModePrefKey);
+      return _normalizeOperationMode(saved ?? 'drilling');
+    } catch (_) {
+      return 'drilling';
+    }
+  }
+
+  Future<void> _persistOperationMode(String mode) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_operationModePrefKey, _normalizeOperationMode(mode));
+    } catch (_) {
+      // Persistencia no crítica: el dashboard debe seguir funcionando aunque falle storage.
+    }
   }
 
   String _normalizeOperationMode(String raw) {

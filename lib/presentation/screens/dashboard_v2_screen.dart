@@ -128,7 +128,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           viewState: viewState,
           uiModel: uiModel,
-          job: job,
         ),
         _buildTilesGrid(viewState, uiModel),
         SliverToBoxAdapter(
@@ -190,7 +189,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
                     padding: const EdgeInsets.fromLTRB(20, 14, 12, 0),
                     viewState: viewState,
                     uiModel: uiModel,
-                    job: job,
                   ),
                   _buildTilesGrid(viewState, uiModel),
                   const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -234,7 +232,6 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
     required EdgeInsets padding,
     required DashboardViewState viewState,
     required DashboardUiModel uiModel,
-    required String job,
   }) {
     final selectedTile = _findSelectedTile(uiModel);
 
@@ -244,7 +241,7 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         delegate: SliverChildListDelegate.fixed(<Widget>[
           WellOverviewCard(
             well: uiModel.activeWell,
-            job: job,
+            job: _operationModeLabel(viewState),
             isActive: viewState.connectionStatus == ConnectionStatus.connected,
           ),
           const SizedBox(height: 12),
@@ -253,6 +250,10 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
             modes: viewState.predictorModes,
             onChanged: (mode) => ref.read(dashboardControllerProvider.notifier).setOperationMode(mode),
           ),
+          if (_operationModeDataHint(viewState) != null) ...<Widget>[
+            const SizedBox(height: 10),
+            _OperationModeDataHint(hint: _operationModeDataHint(viewState)!),
+          ],
           if (selectedTile != null) ...<Widget>[
             const SizedBox(height: 12),
             _SelectedVariableBanner(tile: selectedTile),
@@ -261,6 +262,106 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
         ]),
       ),
     );
+  }
+
+
+  String _operationModeLabel(DashboardViewState viewState) {
+    final configLabel = viewState.predictorConfig?.label.trim();
+    if (configLabel != null && configLabel.isNotEmpty) {
+      return configLabel;
+    }
+
+    for (final mode in viewState.predictorModes) {
+      if (mode.mode == viewState.operationMode && mode.label.trim().isNotEmpty) {
+        return mode.label.trim();
+      }
+    }
+
+    switch (viewState.operationMode.trim().toLowerCase()) {
+      case 'completion':
+        return 'Terminación';
+      case 'production':
+        return 'Producción';
+      case 'drilling':
+      default:
+        return 'Perforación';
+    }
+  }
+
+  _ModeDataHint? _operationModeDataHint(DashboardViewState viewState) {
+    if (viewState.operationMode == 'drilling') {
+      return null;
+    }
+
+    final configuredCount = _enabledVariableCount(viewState);
+    if (configuredCount <= 0) {
+      return null;
+    }
+
+    final dataCount = _variablesWithDataCount(viewState);
+    if (dataCount >= configuredCount) {
+      return null;
+    }
+
+    final modeLabel = _operationModeLabel(viewState);
+    final missingPreview = _missingMnemonicPreview(viewState);
+    final title = dataCount == 0
+        ? 'Sin datos para $modeLabel todavía'
+        : 'Datos parciales de $modeLabel';
+    final detail = dataCount == 0
+        ? (missingPreview.isEmpty
+            ? 'El modo está activo. Esperando muestras de telemetría para esta configuración.'
+            : 'El modo está activo. Esperando muestras: $missingPreview.')
+        : (missingPreview.isEmpty
+            ? '$dataCount de $configuredCount variables tienen muestra reciente.'
+            : '$dataCount de $configuredCount variables tienen muestra reciente. Faltan: $missingPreview.');
+
+    return _ModeDataHint(
+      title: title,
+      detail: detail,
+      isEmpty: dataCount == 0,
+    );
+  }
+
+  int _enabledVariableCount(DashboardViewState viewState) {
+    final config = viewState.predictorConfig;
+    if (config != null && config.variables.isNotEmpty) {
+      final enabled = config.variables.where((variable) => variable.enabled && variable.configured).length;
+      if (enabled > 0) {
+        return enabled;
+      }
+      return config.variables.length;
+    }
+    return viewState.payload.variables.length;
+  }
+
+  int _variablesWithDataCount(DashboardViewState viewState) {
+    return viewState.payload.variables.where(_variableHasData).length;
+  }
+
+  bool _variableHasData(WellVariable variable) {
+    if (variable.value != null) {
+      return true;
+    }
+    final raw = variable.rawTextValue?.trim();
+    return raw != null && raw.isNotEmpty && raw != '---';
+  }
+
+  String _missingMnemonicPreview(DashboardViewState viewState) {
+    final missing = <String>[];
+    for (final variable in viewState.payload.variables) {
+      if (_variableHasData(variable)) {
+        continue;
+      }
+      final tag = variable.tag.trim();
+      if (tag.isNotEmpty && !missing.contains(tag)) {
+        missing.add(tag);
+      }
+      if (missing.length >= 4) {
+        break;
+      }
+    }
+    return missing.join(', ');
   }
 
   Widget _buildTilesGrid(
@@ -1159,6 +1260,91 @@ class _DashboardV2ScreenState extends ConsumerState<DashboardV2Screen> {
   }
 }
 
+
+
+class _ModeDataHint {
+  const _ModeDataHint({
+    required this.title,
+    required this.detail,
+    required this.isEmpty,
+  });
+
+  final String title;
+  final String detail;
+  final bool isEmpty;
+}
+
+class _OperationModeDataHint extends StatelessWidget {
+  const _OperationModeDataHint({required this.hint});
+
+  final _ModeDataHint hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
+    final accent = hint.isEmpty ? LayoutTokens.accentOrange : LayoutTokens.accentBlue;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          accent.withValues(alpha: colors.isDark ? 0.14 : 0.08),
+          colors.card,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: colors.isDark ? 0.38 : 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: colors.isDark ? 0.18 : 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              hint.isEmpty ? Icons.sensors_off_rounded : Icons.info_outline_rounded,
+              size: 16,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  hint.title,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  hint.detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _OperationModeSelector extends StatelessWidget {
   const _OperationModeSelector({
