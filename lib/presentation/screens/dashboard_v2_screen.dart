@@ -1171,6 +1171,9 @@ class _OperationModeSelector extends StatelessWidget {
   final List<PredictorModeSummary> modes;
   final ValueChanged<String> onChanged;
 
+  static const Duration _animationDuration = Duration(milliseconds: 240);
+  static const Curve _animationCurve = Curves.easeOutCubic;
+
   static const List<PredictorModeSummary> _fallbackModes = <PredictorModeSummary>[
     PredictorModeSummary(
       mode: 'drilling',
@@ -1200,51 +1203,183 @@ class _OperationModeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.atalayaColors;
+    final materialTheme = Theme.of(context);
     final effectiveModes = modes.isEmpty ? _fallbackModes : modes;
+    final selectedIndexRaw = effectiveModes.indexWhere((mode) => mode.mode == currentMode);
+    final selectedIndex = selectedIndexRaw < 0 ? 0 : selectedIndexRaw;
+
+    final activeFill = colors.success;
+    final activeTextColor = ThemeData.estimateBrightnessForColor(activeFill) == Brightness.dark
+        ? materialTheme.colorScheme.onPrimary
+        : colors.textPrimary;
+    final inactiveTextColor = colors.textSecondary;
+    final controlBackground = Color.alphaBlend(
+      colors.textPrimary.withValues(alpha: colors.isDark ? 0.065 : 0.045),
+      colors.card,
+    );
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
-        color: LayoutTokens.surfaceCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: LayoutTokens.dividerSubtle),
+        color: colors.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: colors.isDark ? 0.34 : 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          const Text(
+          Text(
             'Modo operativo',
             style: TextStyle(
-              color: LayoutTokens.textSecondary,
+              color: colors.textSecondary,
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.1,
             ),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: effectiveModes.map((mode) {
-              final selected = mode.mode == currentMode;
-              return ChoiceChip(
-                label: Text(mode.label),
-                selected: selected,
-                showCheckmark: false,
-                selectedColor: const Color(0x443FA7FF),
-                backgroundColor: LayoutTokens.bgSecondary,
-                side: BorderSide(
-                  color: selected ? const Color(0x883FA7FF) : LayoutTokens.dividerSubtle,
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 360;
+              final segmentFontSize = compact ? 11.5 : 12.5;
+              final segmentHeight = compact ? 46.0 : 50.0;
+              final segmentCount = effectiveModes.length;
+              final selectedAlignment = _alignmentForIndex(selectedIndex, segmentCount);
+
+              return Container(
+                height: segmentHeight,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: controlBackground,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: colors.border.withValues(alpha: colors.isDark ? 0.85 : 0.55)),
                 ),
-                labelStyle: TextStyle(
-                  color: selected ? Colors.white : LayoutTokens.textSecondary,
-                  fontWeight: FontWeight.w700,
+                child: Stack(
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: AnimatedAlign(
+                        alignment: selectedAlignment,
+                        duration: _animationDuration,
+                        curve: _animationCurve,
+                        child: FractionallySizedBox(
+                          widthFactor: 1 / segmentCount,
+                          heightFactor: 1,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            decoration: BoxDecoration(
+                              color: activeFill,
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: <BoxShadow>[
+                                BoxShadow(
+                                  color: activeFill.withValues(alpha: colors.isDark ? 0.38 : 0.24),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: effectiveModes.map((mode) {
+                        final selected = mode.mode == currentMode;
+                        return Expanded(
+                          child: _OperationModeSegment(
+                            label: mode.label,
+                            selected: selected,
+                            fontSize: segmentFontSize,
+                            activeTextColor: activeTextColor,
+                            inactiveTextColor: inactiveTextColor,
+                            onTap: selected ? null : () => onChanged(mode.mode),
+                          ),
+                        );
+                      }).toList(growable: false),
+                    ),
+                  ],
                 ),
-                onSelected: (_) => onChanged(mode.mode),
               );
-            }).toList(growable: false),
+            },
           ),
         ],
+      ),
+    );
+  }
+
+  static Alignment _alignmentForIndex(int index, int total) {
+    if (total <= 1) {
+      return Alignment.center;
+    }
+    final x = (index / (total - 1)) * 2 - 1;
+    return Alignment(math.max(-1.0, math.min(1.0, x)), 0);
+  }
+}
+
+class _OperationModeSegment extends StatelessWidget {
+  const _OperationModeSegment({
+    required this.label,
+    required this.selected,
+    required this.fontSize,
+    required this.activeTextColor,
+    required this.inactiveTextColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final double fontSize;
+  final Color activeTextColor;
+  final Color inactiveTextColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: AnimatedDefaultTextStyle(
+                duration: _OperationModeSelector._animationDuration,
+                curve: _OperationModeSelector._animationCurve,
+                style: TextStyle(
+                  color: selected ? activeTextColor : inactiveTextColor,
+                  fontSize: fontSize,
+                  height: 1,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
+                  letterSpacing: selected ? 0.05 : 0,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
